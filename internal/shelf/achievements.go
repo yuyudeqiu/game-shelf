@@ -19,11 +19,20 @@ type Achievement struct {
 	Hidden      bool   `json:"hidden"`
 	Achieved    bool   `json:"achieved"`
 	UnlockedAt  *int64 `json:"unlocked_at"`
+	TrophyType  string `json:"trophy_type,omitempty"`
+	GroupID     string `json:"group_id,omitempty"`
+}
+type AchievementGroup struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Icon string `json:"icon"`
 }
 type GameDetail struct {
-	Game             Game          `json:"game"`
-	Achievements     []Achievement `json:"achievements"`
-	DetailsUpdatedAt *int64        `json:"details_updated_at"`
+	Game             Game               `json:"game"`
+	Achievements     []Achievement      `json:"achievements"`
+	DetailsUpdatedAt *int64             `json:"details_updated_at"`
+	Groups           []AchievementGroup `json:"achievement_groups"`
+	GroupsUpdatedAt  *int64             `json:"groups_updated_at"`
 }
 
 func (s *Steam) AchievementDetails(ctx context.Context, appID string) ([]Achievement, error) {
@@ -107,6 +116,9 @@ func (s *Steam) AchievementDetails(ctx context.Context, appID string) ([]Achieve
 }
 
 func (s *Store) SaveAchievementDetails(ctx context.Context, g Game, items []Achievement) error {
+	return s.SaveAchievementDetailsForSet(ctx, g, g.PlatformGameID, items)
+}
+func (s *Store) SaveAchievementDetailsForSet(ctx context.Context, g Game, setID string, items []Achievement) error {
 	if items == nil {
 		items = []Achievement{}
 	}
@@ -131,11 +143,11 @@ func (s *Store) SaveAchievementDetails(ctx context.Context, g Game, items []Achi
 	}
 	now := time.Now().Unix()
 	_, err = tx.ExecContext(ctx, `INSERT INTO achievement_sets(platform,platform_set_id,earned_count,total_count,updated_at) VALUES(?,?,?,?,?)
- ON CONFLICT(platform,platform_set_id) DO UPDATE SET earned_count=excluded.earned_count,total_count=excluded.total_count,updated_at=excluded.updated_at`, g.Platform, g.PlatformGameID, earned, len(items), now)
+ ON CONFLICT(platform,platform_set_id) DO UPDATE SET earned_count=excluded.earned_count,total_count=excluded.total_count,updated_at=excluded.updated_at`, g.Platform, setID, earned, len(items), now)
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE games SET achievement_set_id=(SELECT id FROM achievement_sets WHERE platform=? AND platform_set_id=?) WHERE id=?`, g.Platform, g.PlatformGameID, id)
+	_, err = tx.ExecContext(ctx, `UPDATE games SET achievement_set_id=(SELECT id FROM achievement_sets WHERE platform=? AND platform_set_id=?) WHERE id=?`, g.Platform, setID, id)
 	if err != nil {
 		return err
 	}
@@ -161,10 +173,11 @@ func (s *Store) GameDetail(ctx context.Context, id int64) (*GameDetail, error) {
 	if game == nil {
 		return nil, sql.ErrNoRows
 	}
-	result := &GameDetail{Game: *game, Achievements: []Achievement{}}
+	result := &GameDetail{Game: *game, Achievements: []Achievement{}, Groups: []AchievementGroup{}}
 	var body string
 	var updated int64
-	err = s.DB.QueryRowContext(ctx, `SELECT items_json,updated_at FROM achievement_details WHERE game_id=?`, id).Scan(&body, &updated)
+	var groupsJSON *string
+	err = s.DB.QueryRowContext(ctx, `SELECT items_json,updated_at,groups_json,groups_updated_at FROM achievement_details WHERE game_id=?`, id).Scan(&body, &updated, &groupsJSON, &result.GroupsUpdatedAt)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}
@@ -174,6 +187,11 @@ func (s *Store) GameDetail(ctx context.Context, id int64) (*GameDetail, error) {
 	if err = json.Unmarshal([]byte(body), &result.Achievements); err != nil {
 		return nil, err
 	}
+	if groupsJSON != nil {
+		if err = json.Unmarshal([]byte(*groupsJSON), &result.Groups); err != nil {
+			return nil, err
+		}
+	}
 	result.DetailsUpdatedAt = &updated
 	return result, nil
 }
@@ -181,4 +199,16 @@ func (s *Store) HasAchievementDetails(ctx context.Context, g Game) bool {
 	var found int
 	err := s.DB.QueryRowContext(ctx, `SELECT 1 FROM achievement_details d JOIN games g ON g.id=d.game_id WHERE g.platform=? AND g.platform_game_id=?`, g.Platform, g.PlatformGameID).Scan(&found)
 	return err == nil
+}
+
+// Group metadata updates independently; failed metadata requests never replace it
+// and successful metadata must not make personal unlock states appear fresher.
+func (s *Store) SaveAchievementGroups(ctx context.Context, g Game, groups []AchievementGroup) error {
+	body, err := json.Marshal(groups)
+	if err != nil {
+		return err
+	}
+	_, err = s.DB.ExecContext(ctx, `UPDATE achievement_details SET groups_json=?,groups_updated_at=?
+ WHERE game_id=(SELECT id FROM games WHERE platform=? AND platform_game_id=?)`, string(body), time.Now().Unix(), g.Platform, g.PlatformGameID)
+	return err
 }

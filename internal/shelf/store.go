@@ -60,7 +60,7 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	if version > 2 {
+	if version > 3 {
 		db.Close()
 		return nil, fmt.Errorf("database schema %d is newer than this application", version)
 	}
@@ -113,6 +113,16 @@ PRAGMA user_version=1;`)
 			return nil, err
 		}
 	}
+	if version < 3 {
+		_, err = db.Exec(`BEGIN; ALTER TABLE achievement_details ADD COLUMN groups_json TEXT;
+ ALTER TABLE achievement_details ADD COLUMN groups_updated_at INTEGER;
+ PRAGMA user_version=3; COMMIT;`)
+		if err != nil {
+			_, _ = db.Exec("ROLLBACK")
+			db.Close()
+			return nil, err
+		}
+	}
 	return s, nil
 }
 
@@ -124,13 +134,13 @@ func (s *Store) SaveLibrary(ctx context.Context, games []Game) error {
 	defer tx.Rollback()
 	now := time.Now().Unix()
 	for _, g := range games {
-		_, err = tx.ExecContext(ctx, `INSERT INTO games(platform,platform_game_id,name,cover_url,playtime_seconds,last_played_at,source_scope,last_seen_at,updated_at)
-VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(platform,platform_game_id) DO UPDATE SET
-name=excluded.name,cover_url=COALESCE(games.cover_url,excluded.cover_url),
+		_, err = tx.ExecContext(ctx, `INSERT INTO games(platform,platform_game_id,name,edition_platform,cover_url,playtime_seconds,last_played_at,source_scope,last_seen_at,updated_at)
+VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(platform,platform_game_id) DO UPDATE SET
+name=excluded.name,edition_platform=COALESCE(excluded.edition_platform,games.edition_platform),cover_url=COALESCE(games.cover_url,excluded.cover_url),
 playtime_seconds=COALESCE(excluded.playtime_seconds,games.playtime_seconds),
 last_played_at=COALESCE(excluded.last_played_at,games.last_played_at),
 source_scope=excluded.source_scope,last_seen_at=excluded.last_seen_at,updated_at=excluded.updated_at`,
-			g.Platform, g.PlatformGameID, g.Name, g.CoverURL, g.PlaytimeSeconds, g.LastPlayedAt, g.SourceScope, now, now)
+			g.Platform, g.PlatformGameID, g.Name, g.EditionPlatform, g.CoverURL, g.PlaytimeSeconds, g.LastPlayedAt, g.SourceScope, now, now)
 		if err != nil {
 			return err
 		}

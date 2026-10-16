@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
+import PSNSettingsForm from "./PSNSettingsForm";
 import { Button } from "./components/ui/button";
 
 interface Status {
@@ -24,6 +25,7 @@ export default function SettingsDialog({
   onSaved: () => void;
   demo: boolean;
 }) {
+  const [platform, setPlatform] = useState<"steam" | "psn">("steam");
   const [status, setStatus] = useState<Status | null>(null);
   const [key, setKey] = useState("");
   const [id, setID] = useState("");
@@ -138,7 +140,7 @@ export default function SettingsDialog({
         <div className="modal-heading">
           <div>
             <p className="eyebrow">PLATFORM SETTINGS</p>
-            <h2 id="settings-title">连接你的 Steam</h2>
+            <h2 id="settings-title">连接你的游戏平台</h2>
           </div>
           <Button
             variant="ghost"
@@ -151,13 +153,33 @@ export default function SettingsDialog({
             <X size={18} />
           </Button>
         </div>
+        <div className="settings-platform-tabs" aria-label="选择配置平台">
+          <button
+            type="button"
+            disabled={saving}
+            aria-pressed={platform === "steam"}
+            onClick={() => setPlatform("steam")}
+          >
+            Steam
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            aria-pressed={platform === "psn"}
+            onClick={() => setPlatform("psn")}
+          >
+            PlayStation
+          </button>
+        </div>
         {demo ? (
           <div className="data-notes">
-            <p>演示模式不保存配置。回到你的书架后，即可连接真实 Steam 账号。</p>
+            <p>演示模式不保存配置。回到你的书架后，即可连接 Steam 或 PSN。</p>
             <a className="settings-text-link" href="/">
               返回我的书架 →
             </a>
           </div>
+        ) : platform === "psn" ? (
+          <PSNSettingsForm onSaved={onSaved} onBusyChange={setSaving} />
         ) : (
           <form
             onSubmit={(e) => {

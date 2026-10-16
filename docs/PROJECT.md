@@ -42,8 +42,20 @@ saved atomically on complete responses. The API-name join must be complete befor
 replacing previous details; count-only fallback may still update summary counts.
 Details contain localized names/descriptions, icons, hidden flags, personal unlock
 state and optional unlock timestamps. No inferred partial progress or rarity.
+Schema v3 adds nullable groups_json/groups_updated_at columns to achievement_details.
+Group metadata updates independently of personal unlock snapshots and preserves old
+metadata on network failure. Missing group timestamps cause a backfill on next sync;
+subsequent metadata refreshes occur daily or alongside changed achievement details.
+No new tables; overview totals are unaffected by group rows.
+PSN UI displays content-group cards with unlocked/total count progress, four grade
+counts and filters. Content group, grade, unlocked state and search compose; unknown
+group/grade values remain explicitly unknown. Names come from getTitleTrophyGroups.
+
 Click recent/library games to open an accessible modal, filter/search achievements,
-and explicitly reveal locked hidden content. Demo mode has no fabricated details.
+and explicitly reveal locked hidden content individually or with a game-wide show/hide toggle.
+Reveal state lives in the game dialog, persists across filters/groups, and makes revealed
+names/descriptions searchable. Closing the dialog resets it; no database writes.
+Demo mode has no fabricated details.
 Times are UTC Unix seconds, durations are integer seconds. SQLite NULL means
 unknown; known zero is distinct. Shared PSN trophy sets must be counted once.
 Upsert on (platform, platform_game_id); never merge by name or across platforms.
@@ -70,7 +82,37 @@ References:
 - https://partner.steamgames.com/doc/webapi/IPlayerService
 - https://partner.steamgames.com/doc/webapi/ISteamUserStats
 
-### PSN / v0.2
+### PSN / v0.2 — first live sync and group UI verified
+
+Native Go HTTP integration based on achievements-app/psn-api; no Node subprocess
+or new runtime dependency. PSN settings are independent of Steam. A 64-character
+NPSSO is exchanged transiently, not persisted. Atomic 0600 psn-settings.json stores
+renewable tokens and verified account ID; psn-account prevents mixing accounts.
+Tokens are never exposed by status APIs; response bodies and transport URLs are
+not forwarded in errors. OAuth redirects are not followed. Origin/Host JSON-write
+protection is shared with Steam. Independent workers use the same 6h default.
+
+The played library is fully paginated and validated before upsert. Edition labels
+are persisted. Stable title IDs map through getUserTrophiesForSpecificTitle, in
+batches of five with individual fallback. Ambiguous or absent maps remain unknown;
+there is no game-name matching and no trophy-only synthetic game entry. This means
+historical PS3/Vita titles absent from the played list are not imported yet.
+Counts sum bronze/silver/gold/platinum; shared keys are service:npCommunicationId.
+Definitions and earned states are paginated across all groups and joined by trophyId.
+Complete snapshots reuse the existing detail table; failures retain old snapshots.
+Details refresh on count/playtime changes or after 24h, using snapshot timestamps
+rather than count timestamps. Cover caching now supports PSN image hosts too.
+
+PSN locale: use Accept-Language zh-Hans for Simplified Chinese. Real responses
+for Ghost of Tsushima verified zh-CN/zh-TW silently return English, zh-Hans returns
+Simplified, and zh-Hant returns Traditional. Steam continues using l=schinese.
+PSNSettings.RefreshDetails and sync-psn -refresh-details bypass the 24h cache to
+refresh existing texts/groups while preserving old snapshots on failure. Normal
+sync remains cached. No fabricated or machine-translated trophy descriptions.
+
+Verified reference source at commit 1e9d9a806fcd884a4ddee8086bfe92594611da9f:
+https://github.com/achievements-app/psn-api/tree/1e9d9a806fcd884a4ddee8086bfe92594611da9f/src
+See docs/THIRD_PARTY_NOTICES.md for license attribution.
 
 Unofficial endpoints documented by achievements-app/psn-api. NPSSO bootstraps
 access/refresh tokens; expiry can require local reauthentication. Start with

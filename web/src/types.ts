@@ -63,9 +63,18 @@ export interface Achievement {
   hidden: boolean;
   achieved: boolean;
   unlocked_at: number | null;
+  trophy_type?: string;
+  group_id?: string;
+}
+export interface AchievementGroup {
+  id: string;
+  name: string;
+  icon: string;
 }
 export interface GameDetail {
   game: Game;
   achievements: Achievement[];
   details_updated_at: number | null;
+  achievement_groups: AchievementGroup[];
+  groups_updated_at: number | null;
 }

@@ -43,7 +43,7 @@ type Dashboard struct {
 func Summarize(games []Game) Dashboard {
 	d := Dashboard{Recent: []Game{}, TopPlayed: []Game{}, Platforms: []PlatformStatus{
 		{Platform: "steam", Supported: true, Scope: "owned"},
-		{Platform: "psn", Scope: "played"}, {Platform: "epic", Scope: "owned"},
+		{Platform: "psn", Supported: true, Scope: "played"}, {Platform: "epic", Scope: "owned"},
 	}}
 	seen := map[int64]bool{}
 	for _, g := range games {
@@ -90,12 +90,61 @@ type Server struct {
 	Store      *Store
 	Configured bool
 	Settings   *Settings
+	PSN        *PSNSettings
 	DataDir    string
 	WebDir     string
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/settings/psn", func(w http.ResponseWriter, r *http.Request) {
+		if s.PSN == nil {
+			writeJSON(w, PSNStatus{})
+			return
+		}
+		writeJSON(w, s.PSN.Status())
+	})
+	mux.HandleFunc("POST /api/settings/psn", func(w http.ResponseWriter, r *http.Request) {
+		if !localWrite(r) {
+			jsonError(w, 403, "仅允许从本机书架页面保存配置")
+			return
+		}
+		if s.PSN == nil {
+			apiError(w)
+			return
+		}
+		var input struct {
+			NPSSO string `json:"npsso"`
+		}
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&input) != nil {
+			jsonError(w, 400, "配置格式不正确")
+			return
+		}
+		if err := s.PSN.Save(r.Context(), input.NPSSO); err != nil {
+			jsonError(w, 400, err.Error())
+			return
+		}
+		s.PSN.RequestSync()
+		writeJSON(w, s.PSN.Status())
+	})
+	mux.HandleFunc("POST /api/sync/psn", func(w http.ResponseWriter, r *http.Request) {
+		if !localWrite(r) {
+			jsonError(w, 403, "仅允许从本机书架页面同步")
+			return
+		}
+		if s.PSN == nil || !s.PSN.Status().Configured {
+			jsonError(w, 400, "请先连接 PSN")
+			return
+		}
+		if s.PSN.Status().Busy {
+			jsonError(w, 409, "PSN 正在同步，请稍候")
+			return
+		}
+		s.PSN.RequestSync()
+		w.WriteHeader(http.StatusAccepted)
+	})
 	mux.HandleFunc("GET /api/settings/steam", func(w http.ResponseWriter, r *http.Request) {
 		if s.Settings == nil {
 			apiError(w)
@@ -155,6 +204,9 @@ func (s *Server) Handler() http.Handler {
 		d.Platforms[0].Configured = s.Configured
 		if s.Settings != nil {
 			d.Platforms[0].Configured = s.Settings.Status().Configured
+		}
+		if s.PSN != nil {
+			d.Platforms[1].Configured = s.PSN.Status().Configured
 		}
 		for i := range d.Platforms {
 			d.Platforms[i].Run, err = s.Store.LatestRun(r.Context(), d.Platforms[i].Platform)

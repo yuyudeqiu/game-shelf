@@ -25,9 +25,18 @@ continue without prior conversation history.
   and apply without restarting. Saved settings override initial env credentials.
   Never return stored keys to the frontend, print them, commit them, or request
   them in chat. Empty key on save preserves the existing key. Game data stays read-only.
+- PSN uses an unofficial Sony API. NPSSO is exchanged once and never persisted;
+  renewable tokens are saved atomically to ignored psn-settings.json (0600), never
+  returned to the frontend or logged. Bind verified account ID before game writes.
+  Keep played-list scope explicit, use exact title/trophy IDs, and count shared
+  service:npCommunicationId sets once. Owner confirmed first real PSN sync; broader account accuracy and real token expiry
+  refresh are still pending.
 - Achievement details are complete per-game snapshots, joined by platform API name.
   Preserve previous details on missing/invalid personal states or failed schema requests.
   Keep unknown unlock times null; locked hidden content stays collapsed until revealed.
+  PSN uses Accept-Language zh-Hans for Simplified Chinese; zh-CN falls back to English.
+  PSN group metadata has separate timestamps (schema v3); updating group names must
+  not make personal unlock snapshots appear fresher. Preserve names on failed fetches.
 - Demo data must be explicitly labeled and must not enter the real database.
 - No agent delegation unless explicitly requested by the user.
 

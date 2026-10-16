@@ -145,3 +145,53 @@ func TestAchievementDetailsMigrationUnknownAndKnownZero(t *testing.T) {
 		t.Fatal("empty collection must not be null")
 	}
 }
+
+func TestGroupMetadataMigrationAndIndependentFreshness(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "v2.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := Game{Platform: "psn", PlatformGameID: "PPSA1_00", Name: "Preserved", SourceScope: "played"}
+	if err = s.SaveLibrary(ctx, []Game{g}); err != nil {
+		t.Fatal(err)
+	}
+	items := []Achievement{{APIName: "0", Name: "Base", Achieved: true, GroupID: "default"}, {APIName: "1", Name: "Extra", GroupID: "001"}}
+	if err = s.SaveAchievementDetailsForSet(ctx, g, "trophy2:NPWR1_00", items); err != nil {
+		t.Fatal(err)
+	}
+	// Recreate exactly the pre-v3 detail table layout while retaining the snapshot.
+	if _, err = s.DB.Exec(`ALTER TABLE achievement_details DROP COLUMN groups_json; ALTER TABLE achievement_details DROP COLUMN groups_updated_at; PRAGMA user_version=2;`); err != nil {
+		t.Fatal(err)
+	}
+	s.DB.Close()
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.DB.Close()
+	games, _ := s.Games(ctx)
+	d, err := s.GameDetail(ctx, games[0].ID)
+	if err != nil || len(d.Achievements) != 2 || d.GroupsUpdatedAt != nil || len(d.Groups) != 0 || *d.Game.EarnedCount != 1 {
+		t.Fatal("migration did not preserve prior state", err)
+	}
+	if _, err = s.DB.Exec(`UPDATE achievement_details SET updated_at=1`); err != nil {
+		t.Fatal(err)
+	}
+	groups := []AchievementGroup{{ID: "default", Name: "Main"}, {ID: "001", Name: "Extra pack"}}
+	if err = s.SaveAchievementGroups(ctx, g, groups); err != nil {
+		t.Fatal(err)
+	}
+	d, _ = s.GameDetail(ctx, games[0].ID)
+	if *d.DetailsUpdatedAt != 1 || d.GroupsUpdatedAt == nil || len(d.Groups) != 2 {
+		t.Fatal("metadata changed personal-state freshness")
+	}
+	if err = s.SaveAchievementDetailsForSet(ctx, g, "trophy2:NPWR1_00", items); err != nil {
+		t.Fatal(err)
+	}
+	d, _ = s.GameDetail(ctx, games[0].ID)
+	if len(d.Groups) != 2 || d.Groups[1].Name != "Extra pack" || *d.Game.TotalCount != 2 {
+		t.Fatal("detail refresh erased metadata or altered counts")
+	}
+}

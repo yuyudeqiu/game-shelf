@@ -512,7 +512,7 @@ export default function App() {
                 {isDemo
                   ? "示例档案"
                   : syncing
-                    ? "正在同步 Steam…"
+                    ? "正在同步游戏平台…"
                     : lastSync
                       ? `${ago(lastSync)}已更新`
                       : "等待第一次同步"}
@@ -623,7 +623,9 @@ export default function App() {
                   title={
                     p.run?.error_summary ??
                     (p.supported
-                      ? "游戏库来源：平台拥有列表"
+                      ? p.scope === "played"
+                        ? "游戏库来源：平台已玩列表"
+                        : "游戏库来源：平台拥有列表"
                       : "将在后续版本接入")
                   }
                 >
@@ -1120,8 +1122,8 @@ export default function App() {
               </Button>
             </div>
             <p className="settings-description">
-              在平台设置中填写 Steam API Key 和
-              SteamID64，保存后直接同步，无需编辑文件或重启服务。
+              在平台设置中填写 Steam Key / SteamID64，或连接 PlayStation 的
+              NPSSO，保存后直接同步，无需编辑文件或重启服务。
             </p>
             <Button
               onClick={() => {
@@ -1140,7 +1142,7 @@ export default function App() {
                 等级积分。
               </p>
               <p>
-                PSN 与 Epic
+                PSN 使用社区接口，同步已玩记录；Epic
                 尚待接入。同步失败保留旧记录；封面可能需要联网补充。演示模式的数据独立于你的本地数据库。
               </p>
             </div>

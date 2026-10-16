@@ -263,7 +263,7 @@ func (s *Syncer) cacheCover(ctx context.Context, g Game) error {
 	if err = os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
-	name := "steam-" + g.PlatformGameID + ".jpg"
+	name := g.Platform + "-" + g.PlatformGameID + ".jpg"
 	f, err := os.CreateTemp(dir, "cover-*")
 	if err != nil {
 		return err
@@ -279,7 +279,7 @@ func (s *Syncer) cacheCover(ctx context.Context, g Game) error {
 	if err = os.Rename(f.Name(), filepath.Join(dir, name)); err != nil {
 		return err
 	}
-	return s.Store.SaveCover(ctx, "steam", g.PlatformGameID, name, sourceURL)
+	return s.Store.SaveCover(ctx, g.Platform, g.PlatformGameID, name, sourceURL)
 }
 
 func (s *Syncer) downloadCover(ctx context.Context, sourceURL string) ([]byte, error) {

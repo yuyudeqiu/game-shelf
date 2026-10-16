@@ -3,19 +3,31 @@ import type { ReactNode } from "react";
 import {
   Check,
   ExternalLink,
+  Eye,
+  EyeOff,
   LockKeyhole,
   LoaderCircle,
   Search,
   Trophy,
   X,
 } from "lucide-react";
+import PSNTrophyBrowser from "./PSNTrophyBrowser";
 import { Button } from "./components/ui/button";
 import type { Achievement, Game, GameDetail } from "./types";
 
 const date = (t: number | null) =>
   t ? new Date(t * 1000).toLocaleString("zh-CN") : "时间未知";
-function AchievementRow({ item }: { item: Achievement }) {
-  const [revealed, setRevealed] = useState(false);
+function AchievementRow({
+  item,
+  noun,
+  revealed,
+  onReveal,
+}: {
+  item: Achievement;
+  noun: string;
+  revealed: boolean;
+  onReveal: () => void;
+}) {
   const [failed, setFailed] = useState(false);
   const hidden = item.hidden && !item.achieved && !revealed;
   const icon = item.achieved ? item.icon : item.icon_gray;
@@ -37,7 +49,19 @@ function AchievementRow({ item }: { item: Achievement }) {
       </div>
       <div className="achievement-copy">
         <h3>
-          {hidden ? "隐藏成就" : item.name}{" "}
+          {hidden ? `隐藏${noun}` : item.name}{" "}
+          {!hidden && item.trophy_type && (
+            <span className={`trophy-grade ${item.trophy_type}`}>
+              {(
+                {
+                  bronze: "铜杯",
+                  silver: "银杯",
+                  gold: "金杯",
+                  platinum: "白金",
+                } as Record<string, string>
+              )[item.trophy_type] ?? item.trophy_type}
+            </span>
+          )}
           {item.achieved && <Check size={14} aria-label="已解锁" />}
         </h3>
         <p>
@@ -45,14 +69,11 @@ function AchievementRow({ item }: { item: Achievement }) {
             ? "解锁后揭晓，或手动查看详情。"
             : item.description ||
               (item.hidden
-                ? "Steam 未提供此隐藏成就的说明。"
-                : "Steam 未提供成就说明。")}
+                ? "平台未提供此隐藏内容的说明。"
+                : "平台未提供说明。")}
         </p>
         {hidden && (
-          <button
-            className="reveal-achievement"
-            onClick={() => setRevealed(true)}
-          >
+          <button className="reveal-achievement" onClick={onReveal}>
             显示隐藏内容
           </button>
         )}
@@ -75,6 +96,10 @@ export default function GameDialog({
   demo: boolean;
   onClose: () => void;
 }) {
+  const isPSN = game.platform === "psn";
+  const noun = isPSN ? "奖杯" : "成就";
+  const [showAllHidden, setShowAllHidden] = useState(false);
+  const [revealedIDs, setRevealedIDs] = useState<Set<string>>(() => new Set());
   const [detail, setDetail] = useState<GameDetail | null>(null);
   const [loading, setLoading] = useState(!demo);
   const [error, setError] = useState("");
@@ -157,7 +182,7 @@ export default function GameDialog({
     setSyncing(true);
     setSyncMessage("");
     try {
-      const r = await fetch("/api/sync/steam", {
+      const r = await fetch(`/api/sync/${game.platform}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Game-Shelf": "1" },
         body: "{}",
@@ -166,7 +191,7 @@ export default function GameDialog({
         const d = await r.json();
         throw new Error(d.error || "无法开始同步");
       }
-      setSyncMessage("已安排 Steam 同步，详情会在获取后自动显示。");
+      setSyncMessage("已安排平台同步，详情会在获取后自动显示。");
     } catch (e) {
       setSyncMessage(e instanceof Error ? e.message : "无法连接本地服务");
     } finally {
@@ -174,12 +199,28 @@ export default function GameDialog({
     }
   }
   const items = detail?.achievements ?? [];
+  const hiddenItems = items.filter((a) => a.hidden && !a.achieved);
+  const isRevealed = (a: Achievement) =>
+    showAllHidden || revealedIDs.has(a.api_name);
+  const allHiddenVisible =
+    showAllHidden || (hiddenItems.length > 0 && hiddenItems.every(isRevealed));
+  const reveal = (id: string) =>
+    setRevealedIDs((current) => new Set([...current, id]));
+  function toggleAllHidden() {
+    if (allHiddenVisible) {
+      setShowAllHidden(false);
+      setRevealedIDs(new Set());
+    } else setShowAllHidden(true);
+  }
   const earned = items.filter((a) => a.achieved).length;
   const known = detail?.details_updated_at != null;
   const filtered = items.filter(
     (a) =>
       (filter === "all" || (filter === "earned" ? a.achieved : !a.achieved)) &&
-      (a.hidden && !a.achieved ? "隐藏成就" : `${a.name} ${a.description}`)
+      (a.hidden && !a.achieved && !isRevealed(a)
+        ? `隐藏${noun}`
+        : `${a.name} ${a.description}`
+      )
         .toLocaleLowerCase()
         .includes(query.trim().toLocaleLowerCase()),
   );
@@ -237,7 +278,7 @@ export default function GameDialog({
           <div className="achievement-heading">
             <div>
               <h2>
-                <Trophy size={18} /> 成就档案
+                <Trophy size={18} /> {noun}档案
               </h2>
               <p>
                 {known
@@ -257,40 +298,61 @@ export default function GameDialog({
               <div
                 className="detail-progress"
                 role="progressbar"
-                aria-label="成就完成度"
+                aria-label={`${noun}完成度`}
                 aria-valuenow={earned}
                 aria-valuemin={0}
                 aria-valuemax={items.length}
               >
                 <i style={{ width: `${(earned / items.length) * 100}%` }} />
               </div>
-              <div className="achievement-toolbar">
-                <div className="achievement-tabs" aria-label="成就筛选">
-                  {[
-                    ["all", "全部", items.length],
-                    ["earned", "已解锁", earned],
-                    ["locked", "未解锁", items.length - earned],
-                  ].map(([value, label, count]) => (
-                    <button
-                      key={value}
-                      aria-pressed={filter === value}
-                      className={filter === value ? "selected" : ""}
-                      onClick={() => setFilter(String(value))}
-                    >
-                      {label} <span>{count}</span>
-                    </button>
-                  ))}
+              {hiddenItems.length > 0 && (
+                <div className="hidden-content-actions">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    aria-pressed={allHiddenVisible}
+                    onClick={toggleAllHidden}
+                  >
+                    {allHiddenVisible ? (
+                      <EyeOff size={14} />
+                    ) : (
+                      <Eye size={14} />
+                    )}
+                    {allHiddenVisible
+                      ? "收起全部隐藏内容"
+                      : `显示全部隐藏内容（${hiddenItems.length}）`}
+                  </Button>
                 </div>
-                <label className="achievement-search">
-                  <Search size={14} />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="搜索成就"
-                    aria-label="搜索成就"
-                  />
-                </label>
-              </div>
+              )}
+              {!isPSN && (
+                <div className="achievement-toolbar">
+                  <div className="achievement-tabs" aria-label={`${noun}筛选`}>
+                    {[
+                      ["all", "全部", items.length],
+                      ["earned", "已解锁", earned],
+                      ["locked", "未解锁", items.length - earned],
+                    ].map(([value, label, count]) => (
+                      <button
+                        key={value}
+                        aria-pressed={filter === value}
+                        className={filter === value ? "selected" : ""}
+                        onClick={() => setFilter(String(value))}
+                      >
+                        {label} <span>{count}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <label className="achievement-search">
+                    <Search size={14} />
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder={`搜索${noun}`}
+                      aria-label={`搜索${noun}`}
+                    />
+                  </label>
+                </div>
+              )}
             </>
           )}
           {error && (
@@ -301,26 +363,47 @@ export default function GameDialog({
           {loading ? (
             <div className="achievement-empty">
               <LoaderCircle className="spin" />
-              <p>正在读取成就档案…</p>
+              <p>正在读取{noun}档案…</p>
             </div>
           ) : known ? (
             items.length ? (
-              filtered.length ? (
+              isPSN ? (
+                <PSNTrophyBrowser
+                  items={items}
+                  groups={detail?.achievement_groups ?? []}
+                  isRevealed={isRevealed}
+                  renderItem={(item) => (
+                    <AchievementRow
+                      key={item.api_name}
+                      item={item}
+                      noun={noun}
+                      revealed={isRevealed(item)}
+                      onReveal={() => reveal(item.api_name)}
+                    />
+                  )}
+                />
+              ) : filtered.length ? (
                 <ul className="achievement-list">
                   {filtered.map((item) => (
-                    <AchievementRow key={item.api_name} item={item} />
+                    <AchievementRow
+                      key={item.api_name}
+                      item={item}
+                      noun={noun}
+                      revealed={isRevealed(item)}
+                      onReveal={() => reveal(item.api_name)}
+                    />
                   ))}
                 </ul>
               ) : (
                 <div className="achievement-empty">
                   <Search />
-                  <p>没有匹配的成就，试试其他筛选。</p>
+                  <p>没有匹配的{noun}，试试其他筛选。</p>
                 </div>
               )
             ) : (
               <div className="achievement-empty">
                 <Trophy />
-                <h3>这款游戏没有 Steam 成就</h3>
+                <h3>这款游戏没有{noun}</h3>
                 <p>已通过平台数据确认。</p>
               </div>
             )
@@ -330,24 +413,25 @@ export default function GameDialog({
               <h3>
                 {demo
                   ? "演示书架暂无逐条成就数据"
-                  : game.platform !== "steam"
+                  : game.platform !== "steam" && game.platform !== "psn"
                     ? "这个平台的成就详情尚未接入"
-                    : "尚未获取成就详情"}
+                    : "尚未获取详情"}
               </h3>
               <p>
                 {demo
                   ? "回到你的书架，查看真实游戏的成就档案。"
                   : "已有统计会保留；隐私设置、无成就接口或网络问题可能导致详情暂不可用。"}
               </p>
-              {!demo && game.platform === "steam" && (
-                <Button
-                  variant="outline"
-                  disabled={syncing}
-                  onClick={() => void sync()}
-                >
-                  同步 Steam 成就
-                </Button>
-              )}
+              {!demo &&
+                (game.platform === "steam" || game.platform === "psn") && (
+                  <Button
+                    variant="outline"
+                    disabled={syncing}
+                    onClick={() => void sync()}
+                  >
+                    同步{isPSN ? " PSN 奖杯" : " Steam 成就"}
+                  </Button>
+                )}
             </div>
           )}
           {syncMessage && (

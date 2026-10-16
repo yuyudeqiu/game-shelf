@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -32,18 +33,22 @@ func run() error {
 	if len(os.Args) > 1 {
 		command = os.Args[1]
 	}
-	if command != "serve" && command != "sync" && command != "covers" {
-		return errors.New("usage: go run ./cmd/gameshelf [serve|sync|covers] [-env .env] [-web web/dist]")
+	if command != "serve" && command != "sync" && command != "covers" && command != "sync-psn" {
+		return errors.New("usage: go run ./cmd/gameshelf [serve|sync|sync-psn|covers] [-env .env] [-web web/dist]")
 	}
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	envPath := flags.String("env", ".env", "local environment file")
 	webDir := flags.String("web", "web/dist", "built frontend directory")
+	refreshDetails := flags.Bool("refresh-details", false, "refresh all cached PSN trophy text (sync-psn only)")
 	args := []string{}
 	if len(os.Args) > 2 {
 		args = os.Args[2:]
 	}
 	if err := flags.Parse(args); err != nil {
 		return err
+	}
+	if *refreshDetails && command != "sync-psn" {
+		return errors.New("-refresh-details is only supported with sync-psn")
 	}
 	if err := loadEnv(*envPath); err != nil {
 		return err
@@ -72,6 +77,36 @@ func run() error {
 	settings, err := shelf.NewSettings(dataDir, store, key, id)
 	if err != nil {
 		return err
+	}
+	psnSettings, err := shelf.NewPSNSettings(dataDir, store)
+	if err != nil {
+		return err
+	}
+	psnSync := func() error {
+		log.Print("PSN sync started")
+		var syncErr error
+		if *refreshDetails {
+			syncErr = psnSettings.RefreshDetails(ctx)
+		} else {
+			syncErr = psnSettings.Sync(ctx)
+		}
+		if syncErr != nil {
+			return syncErr
+		}
+		run, err := store.LatestRun(ctx, "psn")
+		if err != nil {
+			return errors.New("could not read PSN sync status")
+		}
+		if run != nil {
+			log.Printf("PSN sync %s: %d games", run.Status, run.ItemsSynced)
+			if run.ErrorSummary != nil {
+				log.Print(*run.ErrorSummary)
+			}
+		}
+		return nil
+	}
+	if command == "sync-psn" {
+		return psnSync()
 	}
 	syncOnce := func() error {
 		steam, err := settings.Begin(ctx)
@@ -108,50 +143,20 @@ func run() error {
 	if ip == nil || !ip.IsLoopback() {
 		return errors.New("LISTEN_ADDR must use a loopback IP, e.g. 127.0.0.1:8080")
 	}
-	server := &http.Server{Addr: addr, Handler: (&shelf.Server{Store: store, Settings: settings, DataDir: dataDir, WebDir: *webDir}).Handler(), ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{Addr: addr, Handler: (&shelf.Server{Store: store, Settings: settings, PSN: psnSettings, DataDir: dataDir, WebDir: *webDir}).Handler(), ReadHeaderTimeout: 5 * time.Second}
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return errors.New("local address unavailable; check LISTEN_ADDR or an already running server")
 	}
-	workerDone := make(chan struct{})
+	var workers sync.WaitGroup
+	workers.Add(2)
 	go func() {
-		defer close(workerDone)
-		var lastAttempt time.Time
-		refresh := func() {
-			if !settings.Status().Configured {
-				return
-			}
-			if !lastAttempt.IsZero() && time.Since(lastAttempt) < min(interval, 15*time.Minute) {
-				return
-			}
-			last, err := store.LastLibrarySync(ctx, "steam")
-			if err != nil {
-				log.Print("Could not read last sync time")
-				return
-			}
-			if last == nil || time.Since(time.Unix(*last, 0)) >= interval {
-				lastAttempt = time.Now()
-				if err := syncOnce(); err != nil && ctx.Err() == nil {
-					log.Print(err)
-				}
-			}
-		}
-		refresh()
-		ticker := time.NewTicker(time.Minute)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-settings.Wake:
-				lastAttempt = time.Now()
-				if err := syncOnce(); err != nil && ctx.Err() == nil {
-					log.Print(err)
-				}
-			case <-ticker.C:
-				refresh()
-			}
-		}
+		defer workers.Done()
+		runSyncWorker(ctx, "steam", store, interval, func() bool { return settings.Status().Configured }, settings.Wake, syncOnce)
+	}()
+	go func() {
+		defer workers.Done()
+		runSyncWorker(ctx, "psn", store, interval, func() bool { return psnSettings.Status().Configured }, psnSettings.Wake, psnSync)
 	}()
 	go func() {
 		<-ctx.Done()
@@ -162,11 +167,50 @@ func run() error {
 	log.Printf("Game Shelf ready at http://%s", addr)
 	err = server.Serve(listener)
 	stop()
-	<-workerDone
+	workers.Wait()
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
 	return err
+}
+
+// One small worker per platform keeps a failed PSN login from delaying Steam.
+func runSyncWorker(ctx context.Context, platform string, store *shelf.Store, interval time.Duration, configured func() bool, wake <-chan struct{}, syncOnce func() error) {
+	var lastAttempt time.Time
+	run := func() {
+		lastAttempt = time.Now()
+		if err := syncOnce(); err != nil && ctx.Err() == nil {
+			log.Print(err)
+		}
+	}
+	refresh := func() {
+		if !configured() || !lastAttempt.IsZero() && time.Since(lastAttempt) < min(interval, 15*time.Minute) {
+			return
+		}
+		last, err := store.LastLibrarySync(ctx, platform)
+		if err != nil {
+			log.Print("Could not read last sync time")
+			return
+		}
+		if last == nil || time.Since(time.Unix(*last, 0)) >= interval {
+			run()
+		}
+	}
+	refresh()
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-wake:
+			if configured() {
+				run()
+			}
+		case <-ticker.C:
+			refresh()
+		}
+	}
 }
 
 func env(key, fallback string) string {

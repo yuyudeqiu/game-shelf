@@ -2406,3 +2406,297 @@ tr:last-child td {
     white-space: nowrap;
   }
 }
+.settings-platform-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 22px;
+  padding: 4px;
+  background: #1b2018;
+  border: 1px solid #343d2e;
+  border-radius: 9px;
+}
+.settings-platform-tabs button {
+  flex: 1;
+  padding: 9px;
+  font-size: 13px;
+  border-radius: 6px;
+  color: #9da991;
+  cursor: pointer;
+}
+.settings-platform-tabs button[aria-pressed="true"] {
+  background: #35422a;
+  color: #d2e6ae;
+}
+.settings-platform-tabs button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.psn-connect-steps {
+  padding-left: 18px;
+  color: #a3ae97;
+  font-size: 12px;
+  line-height: 1.9;
+  margin: 18px 0;
+}
+.psn-connect-steps li {
+  padding-left: 4px;
+  margin-bottom: 7px;
+}
+.psn-connect-steps a {
+  color: #c5dba8;
+  display: inline;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.psn-connect-steps svg {
+  display: inline;
+  vertical-align: middle;
+}
+.psn-connected {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c5dba8;
+  font-size: 13px;
+  padding: 12px;
+  background: #283220;
+  border-radius: 8px;
+}
+.psn-connected small {
+  display: block;
+  font-size: 11px;
+  color: #a3ae97;
+  margin-top: 4px;
+}
+.trophy-grade {
+  font-size: 10px;
+  font-weight: 400;
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: #c4d6e5;
+  background: #28313a;
+}
+.trophy-grade.bronze {
+  color: #d9ad87;
+  background: #392d24;
+}
+.trophy-grade.silver {
+  color: #d1d4d7;
+  background: #303439;
+}
+.trophy-grade.gold {
+  color: #e5cd83;
+  background: #3b3524;
+}
+
+.trophy-group-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 26px 0 12px;
+}
+.trophy-group-heading h3 {
+  margin: 0;
+  font-size: 13px;
+  color: #c2cbb8;
+}
+.trophy-group-heading > span {
+  font-size: 10px;
+  color: #849178;
+}
+.trophy-group-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.trophy-group-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  background: #1c2219;
+  border: 1px solid #343d2e;
+  border-radius: 9px;
+  padding: 13px 14px;
+  min-width: 0;
+  cursor: pointer;
+}
+.trophy-group-card:hover {
+  border-color: #697a57;
+}
+.trophy-group-card.selected {
+  border-color: #a4be7b;
+  background: #2b3521;
+}
+.trophy-group-name {
+  font-size: 12px;
+  color: #d4ddca;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.trophy-group-card > small {
+  font-size: 10px;
+  color: #89977c;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+.trophy-group-count {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 12px;
+  gap: 8px;
+}
+.trophy-group-count strong {
+  color: #d8e7c3;
+  font-size: 20px;
+  font-weight: 500;
+}
+.trophy-group-count em {
+  color: #8e9e7f;
+  font-size: 12px;
+  font-style: normal;
+}
+.trophy-group-count > span {
+  font-size: 10px;
+  color: #acbf92;
+}
+.trophy-group-track {
+  height: 3px;
+  background: #36402e;
+  margin-top: 8px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.trophy-group-track i {
+  display: block;
+  height: 100%;
+  background: #bfd397;
+}
+.trophy-grade-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+.trophy-grade-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 10px;
+  border: 1px solid #353d30;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #a2ac98;
+  background: #1b2018;
+  font-size: 12px;
+}
+.trophy-grade-card.platinum > svg {
+  color: #a5d5e8;
+}
+.trophy-grade-card.gold > svg {
+  color: #dec47a;
+}
+.trophy-grade-card.silver > svg {
+  color: #bec8ce;
+}
+.trophy-grade-card.bronze > svg {
+  color: #c99b76;
+}
+.trophy-grade-card strong {
+  color: #d1dcc5;
+  font-size: 15px;
+  font-weight: 500;
+}
+.trophy-grade-card small {
+  color: #87977a;
+  font-size: 11px;
+}
+.trophy-grade-card.selected {
+  background: #303b26;
+  border-color: #afc989;
+  color: #d5e5bd;
+}
+.trophy-grade-card:hover {
+  border-color: #778a61;
+}
+.trophy-unknown-grade {
+  color: #a5b29a;
+  font-size: 11px;
+  cursor: pointer;
+  margin-top: 10px;
+  text-decoration: underline;
+}
+.trophy-filter-note {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: #b9ca9f;
+  margin: 0 0 16px;
+}
+.trophy-filter-note button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.trophy-list-group-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 12px;
+  background: #242c1e;
+  border-radius: 6px;
+  margin: 10px 0 0;
+}
+.trophy-list-group-heading h3 {
+  margin: 0;
+  font-size: 12px;
+  color: #c9d8b6;
+  line-height: 1.6;
+}
+.trophy-list-group-heading span {
+  font-size: 11px;
+  color: #98ac83;
+  white-space: nowrap;
+}
+@media (max-width: 650px) {
+  .trophy-group-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .trophy-group-heading {
+    flex-direction: column;
+    gap: 5px;
+  }
+  .trophy-grade-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .trophy-grade-card {
+    justify-content: flex-start;
+    padding: 10px;
+  }
+  .trophy-grade-card strong {
+    margin-left: auto;
+  }
+  .trophy-group-card {
+    padding: 10px;
+  }
+}
+
+.hidden-content-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.hidden-content-actions button[aria-pressed="true"] {
+  color: #d2e6ae;
+  border-color: #7a9160;
+  background: #2b3521;
+}
