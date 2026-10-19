@@ -52,9 +52,9 @@ const labels: Record<Platform, string> = {
   epic: "Epic Games",
 };
 const colors: Record<Platform, string> = {
-  steam: "#91b9e5",
-  psn: "#b1a1e6",
-  epic: "#e1c392",
+  steam: "#4c779d",
+  psn: "#7766a6",
+  epic: "#96753d",
 };
 const isDemo = new URLSearchParams(window.location.search).get("demo") === "1";
 const num = (n: number) =>
@@ -812,13 +812,13 @@ export default function App() {
                       margin={{ top: 12, left: 0, right: 34, bottom: 0 }}
                       barSize={15}
                     >
-                      <CartesianGrid horizontal={false} stroke="#ffffff09" />
+                      <CartesianGrid horizontal={false} stroke="#e3e7e1" />
                       <XAxis
                         type="number"
                         allowDecimals={false}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "#6f776e", fontSize: 10 }}
+                        tick={{ fill: "#69746d", fontSize: 10 }}
                       />
                       <YAxis
                         type="category"
@@ -826,10 +826,10 @@ export default function App() {
                         width={86}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "#afb5ac", fontSize: 11 }}
+                        tick={{ fill: "#535e57", fontSize: 11 }}
                       />
                       <Tooltip
-                        cursor={{ fill: "#ffffff04" }}
+                        cursor={{ fill: "#f0f3ee" }}
                         contentStyle={tooltipStyle}
                         formatter={(value) => [`${value} 款`, "游戏数量"]}
                       />
@@ -868,21 +868,21 @@ export default function App() {
                         width={140}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "#b4bbaf", fontSize: 11 }}
+                        tick={{ fill: "#535e57", fontSize: 11 }}
                         tickFormatter={(value) =>
                           value.length > 20 ? `${value.slice(0, 19)}…` : value
                         }
                       />
                       <Tooltip
-                        cursor={{ fill: "#ffffff04" }}
+                        cursor={{ fill: "#f0f3ee" }}
                         contentStyle={tooltipStyle}
                         formatter={(value) => [`${value} h`, "累计游玩"]}
                       />
                       <Bar
                         dataKey="hours"
-                        fill="#c3ed8b"
+                        fill="#61856d"
                         radius={[0, 3, 3, 0]}
-                        background={{ fill: "#ffffff04", radius: 3 }}
+                        background={{ fill: "#f0f3ee", radius: 3 }}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1225,9 +1225,9 @@ function ChartEmpty({ label }: { label: string }) {
   );
 }
 const tooltipStyle = {
-  background: "#222622",
-  border: "1px solid #3c4438",
+  background: "#ffffff",
+  border: "1px solid #e3e7e1",
   borderRadius: 8,
-  color: "#e6ebdf",
+  color: "#252b28",
   fontSize: 12,
 };
