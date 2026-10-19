@@ -13,7 +13,11 @@ The user approved starting implementation after research. Keep the scope small.
 - Top: per-platform sync status and last successful update.
 - Summary: synced platform entries, known total playtime with coverage, earned
   achievements/trophies with platform breakdown and coverage.
-- Recently played: cover cards ordered by actual last-played timestamps.
+- Recently played: horizontal record cards ordered by actual last-played timestamps.
+  Small contained artwork on the left; title/platform/version/date and prominent
+  cumulative hours plus earned/total counts on the right. Count-based progress and
+  percentage accompany known nonempty sets; unknown values remain dashes and
+  confirmed empty sets are labeled. Two desktop columns, one at <=1100px.
 - Two charts: platform game counts and top five games by known playtime.
 - Library: cover, name, platform/version, playtime, earned/total, last played.
   Name search, platform filter, sorting and pagination.
@@ -64,6 +68,11 @@ Click recent/library games to open an accessible modal, filter/search achievemen
 and explicitly reveal locked hidden content individually or with a game-wide show/hide toggle.
 Reveal state lives in the game dialog, persists across filters/groups, and makes revealed
 names/descriptions searchable. Closing the dialog resets it; no database writes.
+The game-wide reveal toggle sits beside the achievement/trophy detail-list heading,
+after group/grade/state/search filters and before results (including empty results),
+with a stacked heading/button on mobile. It does not sit above PSN content groups.
+Hidden rows place the individual reveal action in the description line, keeping
+the same title-plus-description structure as revealed rows; long text wraps naturally.
 Demo mode has no fabricated details.
 Times are UTC Unix seconds, durations are integer seconds. SQLite NULL means
 unknown; known zero is distinct. Shared PSN trophy sets must be counted once.

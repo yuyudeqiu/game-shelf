@@ -1,239 +1,50 @@
-# Development checklist
+# TODO 与当前交接
 
-## v0.1 — Steam daily dashboard
+更新：2026-10-19。使用说明见 [README](README.md)，架构与数据口径见
+[PROJECT](docs/PROJECT.md)，工作约束见 [AGENTS](AGENTS.md)。
+本文件只保留未完成事项、当前状态和最近交接；过程历史查 Git。
 
-- [x] Save project goals, research, constraints and agent handoff instructions.
-- [x] Set up Go + SQLite and three tables with schema versioning.
-- [x] Implement Steam library sync, complete-response validation and idempotent upserts.
-- [x] Add best-effort achievement sync and local artwork caching.
-- [x] Preserve data on privacy errors, network errors and partial failures.
-- [x] Expose read-only dashboard and library API with coverage and sync status.
-- [x] Build responsive dashboard, recent covers, charts, search/filter/sort/paging.
-- [x] Provide an explicitly separate demo mode and a useful real empty state.
-- [x] Add local startup, environment example, stale-data refresh and sync command.
-- [x] Verify backend behavior and frontend production build.
-- [x] Verify layout in a browser (desktop and 390px iframe viewport).
-- [x] Add in-page Steam Key / SteamID64 settings, atomic local persistence and immediate sync.
-- [x] Verify no saved Key is returned, blank-key retention, account isolation and local write protection.
-- [x] Fix Steam cover URLs that require a hashed asset directory; backfill missing covers.
-- [x] Owner configured Steam locally; synced 64 games and checked NBA cover / achievement details.
-- [x] Add persisted per-game achievement details, click-to-open archive, status filters and search.
-- [ ] Complete broader account-level comparison of playtime, library scope and achievement gaps.
+## 待办
 
-## v0.2 — PSN
+- [ ] Steam：对照真实账号核对库范围、时长与成就缺口。
+- [ ] PSN：验证真实 access token 过期后的自动刷新；目前只有模拟测试覆盖该流程。
+- [ ] PSN：继续核对时长、已玩列表范围及奖杯数据准确性。
+- [ ] PSN：确认两条《原神》的精确奖杯映射；保持不同 title ID 分别计数。
+- [ ] PSN：单独验证购买库、订阅口径和 PS3 / Vita 覆盖。
+- [ ] Epic：账号探测后选择原生接入或 Legendary JSON 导入；先做列表和封面，
+  检查 Windows / Mac 覆盖并过滤 DLC / 工具；不支持的指标保持 null。
 
-- [x] Implement NPSSO → tokens and local refresh; verify with simulated Sony endpoints.
-- [x] Owner configured PSN locally; first real library/trophy sync and group UI verified.
-- [ ] Verify real refresh after token expiry and broader account data accuracy.
-- [x] Implement paginated played games, ISO duration, recent time, edition and local cover caching.
-- [x] Map exact title IDs to trophy sets; count shared sets once and persist trophy details.
-- [x] Add PSN settings tab, local token storage, account binding and sync status.
-- [x] Exclude confirmed PSN media-app categories from game views/statistics; retain raw records.
-- [ ] Verify purchased-game list and subscription semantics separately.
+## 当前状态
 
-## v0.3 — Epic
+- Steam、PSN 均已连接并完成真实同步；Epic 尚未接入。
+- 2026-10-19 核对：Steam 64 条、PSN 8 个可见游戏，共 72 条。
+  PSN 原始记录共 10 条，bilibili、Apple Music 已按确认的媒体分类隐藏，记录仍保留。
+- PSN 最近一次同步为 partial：两条《原神》没有唯一奖杯映射；无映射请求、
+  详情、分组或封面请求失败，登录正常。完整账号审计仍未完成。
+- 成就 / 奖杯详情、中文文本、PSN 本体与附加分组及等级筛选已实现。
+  Steam 的 Half-Life、RPG Maker XP 曾缺少可用详情，未推断为零。
+- SQLite 当前 schema v4；分类迁移前备份在忽略目录
+  `data/backups/before-psn-media-filter.db`，其他历史备份同在该目录。
 
-- [ ] Choose native integration or Legendary JSON import after an account probe.
-- [ ] Import library, names and artwork; check Windows/Mac coverage.
-- [ ] Filter DLC/tools; leave unsupported personal metrics null.
+## 最近交付
 
-## Current handoff
+- 最近游玩改为横向记录卡：小封面、大号累计时长和成就数量、完成度；
+  桌面两列、窄屏单列。平台及 PS4 / PS5 标签放大到 12px，并提高对比度。
+- 显示 / 收起全部隐藏内容移到筛选和搜索下方、详情列表标题旁；手机上下排列。
+  仍作用于当前游戏全部隐藏内容，切换分组保留状态，关闭详情重置。
+- 单条隐藏内容的显示按钮占用说明行，消除多余行高；长说明正常换行。
+- 本次提交包含以上前端调整及文档精简；前一提交为 `1c67356`（PSN 媒体应用过滤）。
+  未推送远程。
 
-- Updated 2026-10-19. Initial local snapshot includes the Steam dashboard, settings,
-  artwork repair and per-game achievement archive; no remote push. Go 1.25.14,
-  Node 22.23.0; dependencies pinned. Read README and docs/PROJECT.md first.
-- Steam is configured locally by the owner. Do not read/print saved keys, return
-  them via API or commit anything in ignored data/. Demo data stays frontend-only.
-- User-facing service runs on http://127.0.0.1:8080. `npm start` builds + serves;
-  `npm run sync` syncs Steam; `npm run covers` repairs only missing artwork.
-- Steam dashboard, settings, artwork and achievement details are implemented.
-  PSN has completed a first live sync and trophy group verification; Epic remains future work.
-  No daily-history chart or cloud deployment.
-- Verification includes Go tests (also race), go vet, TS/Vite production build,
-  real Steam sync and browser checks. Build has the known ~655KB chart bundle warning.
-- Next work can continue from the owner's requests. Broader manual comparison of
-  library/playtime/count semantics is still pending; artwork and detail checks do
-  not constitute a full account audit.
+## 验证与运行
 
-### Cover repair follow-up (2026-10-16)
-
-- Owner has configured Steam locally; Chrome shows 64 synced Steam entries.
-- NBA 2K26 (3472040) had no cached cover. The guessed /apps/3472040/header.jpg
-  returned 404; Steam store appdetails returned a working header_image containing
-  an additional asset-hash directory. No credentials were needed for this lookup.
-- Added store-metadata fallback only when a cover download fails. Cache source URL
-  is persisted and no longer overwritten by guessed URLs on subsequent syncs.
-- Added `npm run covers` to repair only missing cached artwork without touching
-  game stats or reading saved Steam keys. Ran it locally: 3 repaired, 0 unavailable.
-- Regression tests cover hashed URLs, persistent cache/source, lost cache retry,
-  unavailable metadata preservation and trusted image-host handling. Go tests,
-  go vet and frontend production build passed. Confirmed NBA artwork in Chrome.
-- Remaining account verification: compare game stats/achievement gaps separately;
-  successful cover repair does not establish all metric accuracy.
-- Restarted only the Game Shelf IPv4 loopback service on :8080 to load the fix;
-  left the unrelated IPv6 listener untouched. User-facing service remains running.
-  Private verification screenshot is under ignored data/qa/covers-repaired.png.
-
-### Per-game achievement archive (2026-10-16)
-
-- Added schema v2: `achievement_details` stores a complete JSON snapshot per game.
-  Database backup before migration is ignored `data/backups/before-achievement-details.db`.
-- Steam schema + personal states are joined strictly by API name, using schinese.
-  Stores name, description, color/gray icon, hidden flag, achieved and unlock time.
-  Missing/invalid/mismatched personal states reject the snapshot; failures preserve
-  previous details. Count-only fallback remains available. Unknown time stays null.
-- Sync enriches games missing details even when count data is still fresh. Existing
-  24h/playtime-change refresh applies after details exist. Read-only GET details
-  uses local SQLite only; UI polls it while open, with a Steam-sync action if missing.
-- Click recent cards or library names. Modal supports all/unlocked/locked filters,
-  search, unlock dates, progress and explicit hidden-content reveal. Escape closes,
-  keyboard focus stays inside and returns to the trigger. Demo has no invented details.
-- Real sync: 62/64 games, 4,194 detail records. Half-Life and RPG Maker XP did not
-  yield usable detail schemas, retained without inferred zero. NBA 2K26: 9/48,
-  39 locked; Chinese names/descriptions and dates verified in browser along with
-  filtering/search/hidden reveal. Icons are remote with fallback; text/state is local.
-- Tests cover API-name joining despite different ordering, partial/missing/duplicate
-  states, persistence/idempotence, v1 migration, null versus confirmed empty, HTTP
-  404 and key redaction. See achievements_test.go.
-- Final verification: `go test -race ./...`, `go vet ./...`, frontend TypeScript +
-  production build passed. Browser checked desktop filters/search/reveal and 390px
-  iframe layout. Private screenshot: ignored data/qa/achievement-details.png.
-- The live :8080 service was restarted with the updated build and remains running.
-
-### PSN integration (2026-10-16)
-
-- Implemented Go-native unofficial PSN auth, token refresh, identity binding, played
-  list pagination, trophy mapping/counts/details, PS4/PS5 edition and cover caching.
-  No new database migration or runtime dependency. See README for exact scope.
-- `PSNSettings` stores only verified account ID and renewable tokens in ignored
-  psn-settings.json (0600). NPSSO is exchanged once, not saved. Local-only API
-  routes are /api/settings/psn and /api/sync/psn. Never read/print real tokens.
-- Frontend: platform settings has Steam / PlayStation tabs, Sony sign-in and NPSSO
-  page links, password input and connect/sync controls. Common game modal supports
-  PSN trophy grades, filtering, hidden reveal and unlock dates.
-- CLI: `npm run sync:psn`. Independent per-platform workers prevent PSN failures
-  from delaying Steam. Steam command/settings behavior preserved.
-- Tests pass: Go race suite, go vet, TS/Vite build. Fixtures cover auth grant,
-  automatic refresh/persistence, null vs known zero, pagination interruption and
-  duplicate pages, exact trophy joins, shared-set counts, stale detail refresh,
-  invalid replacement preservation, account isolation and local-write redaction.
-- UI verified live with existing Steam data and empty PSN settings. Service :8080
-  restarted and remains running. Private screenshot: data/qa/psn-settings.png.
-- No real PSN credentials were available or used. NEXT: owner opens platform
-  settings → PlayStation, signs in to Sony in their browser, gets NPSSO and pastes
-  locally. Check real auth, several PS4/PS5 titles, counts/details, playtime and
-  pagination. Do not claim real-account sync verified until that succeeds.
-- No complete purchased/subscription library and no validated PS3/Vita coverage.
-  Absent/ambiguous trophy mappings stay unknown. API changes may require follow-up.
-- Last committed baseline: 599d765. PSN changes are included in the follow-up feature snapshot.
-
-### PSN trophy groups and grades (2026-10-16)
-
-- Owner confirmed PSN connected successfully. Local data has 9 PSN entries and
-  5 complete trophy detail snapshots. Initial "no credentials available" notes
-  above describe the earlier handoff and are superseded by this follow-up.
-- Added native getTitleTrophyGroups metadata lookup, cached once per shared set
-  per run. SQLite v3 adds groups_json/groups_updated_at to achievement_details.
-  Migration preserves old games/items/counts; backup is ignored
-  data/backups/before-trophy-groups.db. Metadata failure preserves prior names;
-  metadata success leaves personal unlock snapshot timestamps unchanged.
-- Added PSNTrophyBrowser: content groups (base/default, named additional content),
-  per-group unlocked/total counts and percentages, platinum/gold/silver/bronze
-  counts and filters, composed with unlock state and search. Lists also display
-  group headings. Missing names fall back to numbered groups; unknown ID/type
-  stays unknown. Percentages use trophy counts, not inferred platform weighting.
-- Real backfill: 16 content groups across 5 games. Ghost of Tsushima has 6 groups:
-  main 41/52, Legends 0/6, New Game+ 0/2, Iki Story 4/7, Iki Exploration 1/6,
-  Rivals/Mastery 0/4. Overall 46/77. UI verified selecting Iki Story then Gold
-  yields one locked trophy and filter counters 1/0/1. No credentials were printed.
-- Checks passed: Go race tests, go vet and TypeScript/Vite build. Tests cover v2→v3
-  migration, metadata persistence/failure preservation and separate freshness.
-- Live :8080 server restarted and remains running; triggered one normal PSN sync.
-  All 5 mapped titles got group metadata; 4 unmapped entries remain unchanged.
-  Existing library currently includes non-game PSN apps and two Genshin entries;
-  filtering apps / assessing title-scope semantics remains a separate follow-up.
-- Private screenshot: data/qa/psn-trophy-groups.png. Updated README/PROJECT/AGENTS.
-  PSN feature changes are included in the follow-up snapshot after baseline 599d765.
-
-### PSN Chinese localization fix (2026-10-16)
-
-- Root cause: zh-CN is not the working Sony trophy locale. An opt-in transient
-  probe with the configured account confirmed zh-CN/zh-TW returned English,
-  zh-Hans Simplified, zh-Hant Traditional. Probe logged only sample trophy text,
-  no credentials; its temporary test file was removed.
-- Changed default Accept-Language to zh-Hans (Steam already uses schinese).
-  Added RefreshDetails + CLI `npm run sync:psn -- -refresh-details` to bypass
-  fresh cached texts without falsifying old timestamps or losing failure protection.
-- Ran the forced sync locally, then restarted the updated :8080 service. All 301
-  trophy names across the 5 mapped games now contain Chinese; descriptions and
-  additional group names were refreshed too. Some proper game titles stay English
-  exactly as Sony returns them. Four unmapped PSN entries remain unchanged.
-- Compared every trophy's ID, unlock state/date, grade and group ID before/after:
-  unchanged. Baseline is ignored data/qa/psn-states-before-language.json.
-- Go race tests, go vet and frontend build passed. New regression checks explicit
-  refresh versus normal caching and failure preservation; fixtures enforce zh-Hans.
-  Browser verified Chinese names/descriptions/groups. Screenshot is ignored
-  data/qa/psn-chinese-trophies.png. Service remains running; included in the follow-up feature snapshot.
-
-### Bulk hidden-content reveal (2026-10-16)
-
-- Added a game-wide show/hide-all control below the detail progress bar, shared by
-  Steam and PSN. Only displayed when the game has locked hidden achievements.
-- Individual reveal remains supported. Reveal IDs now live in the parent dialog,
-  so group/state filters do not reset them. Revealed names/descriptions participate
-  in search; hide-all clears individual reveals too. Closing resets the dialog.
-- Frontend-only state, no persistence or sync changes. Existing service serves the
-  rebuilt assets immediately; no restart needed. Go tests and frontend build passed.
-- Browser verified all 7 hidden Ghost of Tsushima trophies reveal together, remain
-  visible across group changes, collapse together, and can be searched by actual
-  names (e.g. 猴子). Private screenshot: data/qa/bulk-hidden-content.png.
-- README/PROJECT updated. Included in the follow-up snapshot with the PSN work.
-
-### Commit and cleanup (2026-10-16)
-
-- User requested committing the current implementation and closing test processes.
-  Snapshot includes PSN integration, grouped/graded trophies, Chinese localization
-  and the bulk hidden-content toggle, plus tests and updated handoff documentation.
-- Latest checks already passed: Go tests/race, go vet, frontend TS/Vite build,
-  browser checks for grouping, Chinese text and bulk reveal/search/collapse.
-- Process/listener audit found no remaining test Go processes, Vite servers or
-  temporary :8081/:5173 servers. Task-owned in-app browser test tabs are closed.
-  Only the user-facing ./bin/gameshelf serve on 127.0.0.1:8080 remains running.
-  Codex-managed tool infrastructure is not an application test server.
-- Credentials, local databases, backups, cached media, QA screenshots, builds and
-  dependencies remain ignored. No remote push was requested or performed.
-
-### PSN media-application filtering (2026-10-19)
-
-- Owner approved classification-based filtering, keeping cross-platform and distinct
-  version/title-ID entries separate. Live authenticated category probe confirmed
-  bilibili (PPSA06274_00) = ps5_web_based_media_app, Apple Music (PPSA03622_00) =
-  ps5_native_media_app. Existing credentials worked; no reauthentication required.
-  Probe printed only title IDs/names/categories; temporary probe test was removed.
-- Schema v4 adds nullable games.source_category. Full pagination and ID/name
-  validation precede atomic list/category persistence. The two confirmed media
-  categories are omitted by the shared Games view, which feeds dashboard, recent,
-  rankings, library search/pagination and game detail. Sync skips their cover/trophy
-  enrichment. No name matching, ID exclusions, new UI or generic provider framework.
-- Keep all app rows, cover links and achievement snapshots for recovery. Missing/
-  empty classification preserves the prior value; initially unknown and new
-  categories remain visible. An explicit new category can restore a retained row.
-  Account binding checks raw rows, including when all PSN entries are hidden apps.
-- Live sync applied successfully: 10 raw PSN rows retained, 8 visible games; excluded
-  media time 6,071 seconds. Two distinct Genshin title IDs remain separate. PSN run
-  is partial solely for their two missing unique trophy mappings: 0 mapping request,
-  detail/group or cover failures. This is not a credential failure.
-- Backup before migration: ignored data/backups/before-psn-media-filter.db.
-  Verified no prior PSN row IDs were removed. HTTP checks show Steam 64, PSN 8,
-  overall 72; application names are absent from the PSN library.
-- Go tests, race suite, go vet, frontend TS/Vite build and git diff --check passed.
-  Regression coverage includes interrupted/duplicate pagination preserving previous
-  visibility, category persistence/restart and v3 migration, idempotence, unknown/
-  zero semantics, all read views/404 details, distinct versions/platforms, reversible
-  reclassification and app-only account isolation. Known bundle-size warning remains.
-- Local :8080 service was not running at session start; built and started updated
-  ./bin/gameshelf serve. It remains running. Owner subsequently requested committing
-  this filtering implementation, tests and documentation. No remote push requested.
-- Still pending: broader account data comparison, real expired-token refresh and
-  purchase/subscription scope. Future media categories require confirmation before
-  adding them to the small explicit category list; do not exclude unknown categories.
+- 本次：`go test ./...`、`npm --prefix web run build`、`git diff --check` 通过。
+  前端仍有约 667KB 的图表包体积提示，不影响构建。
+- 浏览器已检查桌面及 390px：卡片排版、平台字号、零值、无横向溢出、点击详情；
+  Steam / PSN 隐藏内容开关、分组切换、空搜索结果及条目行高。
+- 后端媒体过滤此前已通过 Go race、go vet 及迁移 / 失败保留 / 账号隔离回归。
+- 当前本地服务：`./bin/gameshelf serve`，http://127.0.0.1:8080。
+  已构建前端资源；纯前端修改无需重启。测试页已关闭，临时视口已恢复。
+- 本次截图在忽略目录 `data/qa/`：`recent-platform-readable.png`、
+  `recent-record-cards-mobile.png`、`hidden-toggle-position-*.png`、
+  `achievement-row-height-*.png`。凭据、数据库与截图不入 Git。

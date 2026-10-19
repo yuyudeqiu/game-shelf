@@ -16,11 +16,13 @@ export default function PSNTrophyBrowser({
   groups,
   renderItem,
   isRevealed,
+  listHeading,
 }: {
   items: Achievement[];
   groups: AchievementGroup[];
   renderItem: (item: Achievement) => ReactNode;
   isRevealed: (item: Achievement) => boolean;
+  listHeading: ReactNode;
 }) {
   const [selectedGroup, setSelectedGroup] = useState("all");
   const [grade, setGrade] = useState("all");
@@ -177,6 +179,7 @@ export default function PSNTrophyBrowser({
           </button>
         </div>
       )}
+      {listHeading}
       {matches.length ? (
         ids
           .filter((id) => matches.some((a) => groupID(a) === id))

@@ -199,6 +199,78 @@ function Progress({
     </div>
   );
 }
+function RecentGameCard({ game, onOpen }: { game: Game; onOpen: () => void }) {
+  const noun = game.platform === "psn" ? "奖杯" : "成就";
+  const known = game.earned_count !== null && game.total_count !== null;
+  const noAchievements = known && game.total_count === 0;
+  const percent = known && game.total_count! > 0
+    ? Math.min(100, (game.earned_count! / game.total_count!) * 100)
+    : null;
+  return (
+    <article className="recent-card">
+      <button
+        className="recent-detail-link"
+        aria-label={`查看 ${game.name} 成就详情`}
+        onClick={onOpen}
+      />
+      <div className="recent-art"><Cover game={game} /></div>
+      <div className="recent-body">
+        <div className="recent-heading">
+          <h3 title={game.name}>{game.name}</h3>
+          <span className="recent-time" title={exactTime(game.last_played_at)}>
+            {ago(game.last_played_at)}
+          </span>
+        </div>
+        <div className="recent-platform">
+          <PlatformMark platform={game.platform} small />
+          <span>{labels[game.platform]}</span>
+          {game.edition_platform && game.edition_platform !== labels[game.platform] && (
+            <span className="recent-edition">{game.edition_platform}</span>
+          )}
+        </div>
+        <div className="recent-metrics">
+          <div className="recent-playtime">
+            <div className="recent-value">
+              <strong>{hours(game.playtime_seconds)}</strong>
+              {game.playtime_seconds !== null && <span>小时</span>}
+            </div>
+            <span className="recent-metric-label">
+              <Clock3 size={12} />{game.playtime_seconds === null ? "游玩时长未知" : "累计游玩"}
+            </span>
+          </div>
+          <div className="recent-achievements">
+            <div className={`recent-value ${noAchievements ? "recent-value-empty" : ""}`}>
+              {noAchievements ? <strong>无{noun}</strong> : (
+                <>
+                  <strong>{game.earned_count === null ? "—" : num(game.earned_count)}</strong>
+                  <span>/ {game.total_count === null ? "—" : num(game.total_count)}</span>
+                </>
+              )}
+            </div>
+            <span className="recent-metric-label">
+              <Trophy size={12} />{known ? (noAchievements ? "平台已确认" : `${noun}已解锁`) : `${noun}数据未完整获取`}
+            </span>
+            {percent !== null && (
+              <div className="recent-completion">
+                <div
+                  className="progress-track"
+                  role="progressbar"
+                  aria-label={`${game.name} ${noun}进度`}
+                  aria-valuemin={0}
+                  aria-valuemax={game.total_count!}
+                  aria-valuenow={game.earned_count!}
+                >
+                  <i style={{ width: `${percent}%` }} />
+                </div>
+                <span>{Math.round(percent)}%</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
 function platformState(p: PlatformStatus) {
   if (isDemo) return "演示数据";
   if (!p.supported) return "待接入";
@@ -700,34 +772,11 @@ export default function App() {
             {dashboard?.recent.length ? (
               <div className="recent-grid">
                 {dashboard.recent.map((g) => (
-                  <article key={g.id} className="recent-card">
-                    <button
-                      className="recent-detail-link"
-                      aria-label={`查看 ${g.name} 成就详情`}
-                      onClick={() => setSelectedGame(g)}
-                    />
-                    <div className="recent-art">
-                      <Cover game={g} />
-                      <span className="recent-time">
-                        {ago(g.last_played_at)}
-                      </span>
-                      <span className="recent-platform">
-                        <PlatformMark platform={g.platform} small />
-                      </span>
-                    </div>
-                    <div className="recent-body">
-                      <h3 title={g.name}>{g.name}</h3>
-                      <div className="recent-meta">
-                        <span>
-                          <Clock3 size={12} />
-                          {hours(g.playtime_seconds)}
-                          {g.playtime_seconds !== null ? " h" : ""}
-                        </span>
-                        <span>{g.edition_platform ?? labels[g.platform]}</span>
-                      </div>
-                      <Progress game={g} compact />
-                    </div>
-                  </article>
+                  <RecentGameCard
+                    key={g.id}
+                    game={g}
+                    onOpen={() => setSelectedGame(g)}
+                  />
                 ))}
               </div>
             ) : (

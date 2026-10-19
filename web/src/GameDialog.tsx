@@ -65,18 +65,17 @@ function AchievementRow({
           {item.achieved && <Check size={14} aria-label="已解锁" />}
         </h3>
         <p>
-          {hidden
-            ? "解锁后揭晓，或手动查看详情。"
-            : item.description ||
-              (item.hidden
-                ? "平台未提供此隐藏内容的说明。"
-                : "平台未提供说明。")}
+          {hidden ? (
+            <button className="reveal-achievement" onClick={onReveal}>
+              显示隐藏内容
+            </button>
+          ) : (
+            item.description ||
+            (item.hidden
+              ? "平台未提供此隐藏内容的说明。"
+              : "平台未提供说明。")
+          )}
         </p>
-        {hidden && (
-          <button className="reveal-achievement" onClick={onReveal}>
-            显示隐藏内容
-          </button>
-        )}
       </div>
       <div className="achievement-state">
         <span>{item.achieved ? "已解锁" : "未解锁"}</span>
@@ -224,6 +223,25 @@ export default function GameDialog({
         .toLocaleLowerCase()
         .includes(query.trim().toLocaleLowerCase()),
   );
+  const listHeading = (
+    <div className="achievement-list-heading">
+      <h3>{noun}详情</h3>
+      {hiddenItems.length > 0 && (
+        <Button
+          className="hidden-content-toggle"
+          variant="outline"
+          size="sm"
+          aria-pressed={allHiddenVisible}
+          onClick={toggleAllHidden}
+        >
+          {allHiddenVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+          {allHiddenVisible
+            ? "收起全部隐藏内容"
+            : `显示全部隐藏内容（${hiddenItems.length}）`}
+        </Button>
+      )}
+    </div>
+  );
   const current = detail?.game ?? game;
   return (
     <div className="modal-backdrop game-backdrop" onClick={onClose}>
@@ -305,25 +323,6 @@ export default function GameDialog({
               >
                 <i style={{ width: `${(earned / items.length) * 100}%` }} />
               </div>
-              {hiddenItems.length > 0 && (
-                <div className="hidden-content-actions">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    aria-pressed={allHiddenVisible}
-                    onClick={toggleAllHidden}
-                  >
-                    {allHiddenVisible ? (
-                      <EyeOff size={14} />
-                    ) : (
-                      <Eye size={14} />
-                    )}
-                    {allHiddenVisible
-                      ? "收起全部隐藏内容"
-                      : `显示全部隐藏内容（${hiddenItems.length}）`}
-                  </Button>
-                </div>
-              )}
               {!isPSN && (
                 <div className="achievement-toolbar">
                   <div className="achievement-tabs" aria-label={`${noun}筛选`}>
@@ -353,6 +352,7 @@ export default function GameDialog({
                   </label>
                 </div>
               )}
+              {!isPSN && listHeading}
             </>
           )}
           {error && (
@@ -372,6 +372,7 @@ export default function GameDialog({
                   items={items}
                   groups={detail?.achievement_groups ?? []}
                   isRevealed={isRevealed}
+                  listHeading={listHeading}
                   renderItem={(item) => (
                     <AchievementRow
                       key={item.api_name}
