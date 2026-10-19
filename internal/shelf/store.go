@@ -27,6 +27,7 @@ type Game struct {
 	EarnedCount          *int64  `json:"earned_count"`
 	TotalCount           *int64  `json:"total_count"`
 	SourceScope          string  `json:"source_scope"`
+	SourceCategory       *string `json:"-"`
 	UpdatedAt            int64   `json:"updated_at"`
 	AchievementUpdatedAt *int64  `json:"achievement_updated_at"`
 }
@@ -60,7 +61,7 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	if version > 3 {
+	if version > 4 {
 		db.Close()
 		return nil, fmt.Errorf("database schema %d is newer than this application", version)
 	}
@@ -123,6 +124,15 @@ PRAGMA user_version=1;`)
 			return nil, err
 		}
 	}
+	if version < 4 {
+		_, err = db.Exec(`BEGIN; ALTER TABLE games ADD COLUMN source_category TEXT;
+ PRAGMA user_version=4; COMMIT;`)
+		if err != nil {
+			_, _ = db.Exec("ROLLBACK")
+			db.Close()
+			return nil, err
+		}
+	}
 	return s, nil
 }
 
@@ -134,13 +144,13 @@ func (s *Store) SaveLibrary(ctx context.Context, games []Game) error {
 	defer tx.Rollback()
 	now := time.Now().Unix()
 	for _, g := range games {
-		_, err = tx.ExecContext(ctx, `INSERT INTO games(platform,platform_game_id,name,edition_platform,cover_url,playtime_seconds,last_played_at,source_scope,last_seen_at,updated_at)
-VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(platform,platform_game_id) DO UPDATE SET
+		_, err = tx.ExecContext(ctx, `INSERT INTO games(platform,platform_game_id,name,edition_platform,cover_url,playtime_seconds,last_played_at,source_scope,source_category,last_seen_at,updated_at)
+VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(platform,platform_game_id) DO UPDATE SET
 name=excluded.name,edition_platform=COALESCE(excluded.edition_platform,games.edition_platform),cover_url=COALESCE(games.cover_url,excluded.cover_url),
 playtime_seconds=COALESCE(excluded.playtime_seconds,games.playtime_seconds),
 last_played_at=COALESCE(excluded.last_played_at,games.last_played_at),
-source_scope=excluded.source_scope,last_seen_at=excluded.last_seen_at,updated_at=excluded.updated_at`,
-			g.Platform, g.PlatformGameID, g.Name, g.EditionPlatform, g.CoverURL, g.PlaytimeSeconds, g.LastPlayedAt, g.SourceScope, now, now)
+source_scope=excluded.source_scope,source_category=COALESCE(NULLIF(excluded.source_category,''),games.source_category),last_seen_at=excluded.last_seen_at,updated_at=excluded.updated_at`,
+			g.Platform, g.PlatformGameID, g.Name, g.EditionPlatform, g.CoverURL, g.PlaytimeSeconds, g.LastPlayedAt, g.SourceScope, g.SourceCategory, now, now)
 		if err != nil {
 			return err
 		}
@@ -173,7 +183,7 @@ func (s *Store) SaveCover(ctx context.Context, platform, gameID, path, sourceURL
 
 func (s *Store) Games(ctx context.Context) ([]Game, error) {
 	rows, err := s.DB.QueryContext(ctx, `SELECT g.id,g.platform,g.platform_game_id,g.name,g.edition_platform,g.cover_url,g.cover_path,
-g.playtime_seconds,g.last_played_at,g.achievement_set_id,a.earned_count,a.total_count,g.source_scope,g.updated_at,a.updated_at
+g.playtime_seconds,g.last_played_at,g.achievement_set_id,a.earned_count,a.total_count,g.source_scope,g.updated_at,a.updated_at,g.source_category
 FROM games g LEFT JOIN achievement_sets a ON g.achievement_set_id=a.id ORDER BY g.last_played_at DESC,g.name COLLATE NOCASE,g.id`)
 	if err != nil {
 		return nil, err
@@ -182,8 +192,11 @@ FROM games g LEFT JOIN achievement_sets a ON g.achievement_set_id=a.id ORDER BY 
 	games := []Game{}
 	for rows.Next() {
 		var g Game
-		if err := rows.Scan(&g.ID, &g.Platform, &g.PlatformGameID, &g.Name, &g.EditionPlatform, &g.CoverURL, &g.CoverPath, &g.PlaytimeSeconds, &g.LastPlayedAt, &g.AchievementSetID, &g.EarnedCount, &g.TotalCount, &g.SourceScope, &g.UpdatedAt, &g.AchievementUpdatedAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.Platform, &g.PlatformGameID, &g.Name, &g.EditionPlatform, &g.CoverURL, &g.CoverPath, &g.PlaytimeSeconds, &g.LastPlayedAt, &g.AchievementSetID, &g.EarnedCount, &g.TotalCount, &g.SourceScope, &g.UpdatedAt, &g.AchievementUpdatedAt, &g.SourceCategory); err != nil {
 			return nil, err
+		}
+		if g.isPSNMediaApp() {
+			continue
 		}
 		games = append(games, g)
 	}

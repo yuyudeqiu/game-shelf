@@ -116,7 +116,7 @@ func TestAchievementDetailsMigrationUnknownAndKnownZero(t *testing.T) {
 	if err = s.SaveLibrary(ctx, []Game{g}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.DB.Exec(`DROP TABLE achievement_details; PRAGMA user_version=1;`); err != nil {
+	if _, err = s.DB.Exec(`DROP TABLE achievement_details; ALTER TABLE games DROP COLUMN source_category; PRAGMA user_version=1;`); err != nil {
 		t.Fatal(err)
 	}
 	s.DB.Close()
@@ -162,7 +162,7 @@ func TestGroupMetadataMigrationAndIndependentFreshness(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Recreate exactly the pre-v3 detail table layout while retaining the snapshot.
-	if _, err = s.DB.Exec(`ALTER TABLE achievement_details DROP COLUMN groups_json; ALTER TABLE achievement_details DROP COLUMN groups_updated_at; PRAGMA user_version=2;`); err != nil {
+	if _, err = s.DB.Exec(`ALTER TABLE achievement_details DROP COLUMN groups_json; ALTER TABLE achievement_details DROP COLUMN groups_updated_at; ALTER TABLE games DROP COLUMN source_category; PRAGMA user_version=2;`); err != nil {
 		t.Fatal(err)
 	}
 	s.DB.Close()

@@ -267,9 +267,28 @@ func (p *PSN) Library(ctx context.Context) ([]Game, error) {
 		if image == nil {
 			image = psnImage(item.Image)
 		}
-		games = append(games, Game{Platform: "psn", PlatformGameID: item.ID, Name: name, EditionPlatform: &edition, CoverURL: image, PlaytimeSeconds: psnDuration(item.Duration), LastPlayedAt: psnTime(item.LastPlayed), SourceScope: "played"})
+		var category *string
+		if item.Category != "" {
+			value := item.Category
+			category = &value
+		}
+		games = append(games, Game{Platform: "psn", PlatformGameID: item.ID, Name: name, EditionPlatform: &edition, CoverURL: image, PlaytimeSeconds: psnDuration(item.Duration), LastPlayedAt: psnTime(item.LastPlayed), SourceScope: "played", SourceCategory: category})
 	}
 	return games, nil
+}
+
+// Only categories confirmed as media applications are excluded. Missing/new
+// categories remain visible; names, title IDs and trophy availability are not classifiers.
+func (g Game) isPSNMediaApp() bool {
+	if g.Platform != "psn" || g.SourceCategory == nil {
+		return false
+	}
+	switch *g.SourceCategory {
+	case "ps5_web_based_media_app", "ps5_native_media_app":
+		return true
+	default:
+		return false
+	}
 }
 
 type psnCounts struct {

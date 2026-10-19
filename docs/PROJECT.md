@@ -1,6 +1,6 @@
 # Project decisions
 
-Last updated: 2026-10-16 (Asia/Shanghai).
+Last updated: 2026-10-19 (Asia/Shanghai).
 
 ## Goal
 
@@ -47,6 +47,15 @@ Group metadata updates independently of personal unlock snapshots and preserves 
 metadata on network failure. Missing group timestamps cause a backfill on next sync;
 subsequent metadata refreshes occur daily or alongside changed achievement details.
 No new tables; overview totals are unaffected by group rows.
+Schema v4 adds nullable games.source_category, preserving all existing rows and
+snapshots. PSN persists categories only after a fully validated played list, then
+excludes the two live-confirmed media categories ps5_web_based_media_app and
+ps5_native_media_app from the shared Games read view and trophy/cover enrichment.
+Applications remain stored for recovery; list/search/detail/dashboard all use that
+view. Missing or empty category updates preserve prior classification; new unknown
+categories remain visible. Never classify by title name, trophy availability or
+title ID. Explicit later reclassification restores visibility. Retained application
+rows still participate in account-binding checks. No new settings or management UI.
 PSN UI displays content-group cards with unlocked/total count progress, four grade
 counts and filters. Content group, grade, unlocked state and search compose; unknown
 group/grade values remain explicitly unknown. Names come from getTitleTrophyGroups.

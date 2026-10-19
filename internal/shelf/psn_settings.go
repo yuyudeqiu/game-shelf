@@ -105,14 +105,14 @@ func (s *PSNSettings) bind(ctx context.Context, id string) error {
 		return errors.New("无法读取 PSN 账号绑定")
 	}
 	if strings.TrimSpace(string(bound)) != id {
-		games, err := s.store.Games(ctx)
-		if err != nil {
+		var exists bool
+		// Retained media-app rows still belong to the bound account, even though
+		// they are hidden from Games and all read-only dashboard views.
+		if err := s.store.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM games WHERE platform='psn')`).Scan(&exists); err != nil {
 			return errors.New("无法检查 PSN 账号")
 		}
-		for _, g := range games {
-			if g.Platform == "psn" {
-				return errors.New("书架已有其他 PSN 账号的数据，请使用新的 DATA_DIR")
-			}
+		if exists {
+			return errors.New("书架已有其他 PSN 账号的数据，请使用新的 DATA_DIR")
 		}
 	}
 	if err = os.MkdirAll(s.dir, 0700); err != nil {
@@ -239,6 +239,26 @@ func syncPSN(ctx context.Context, p *PSN, store *Store, dir string, refreshDetai
 	if err = store.SaveLibrary(ctx, games); err != nil {
 		return 0, nil, errors.New("无法保存 PSN 游戏列表")
 	}
+	// Persist classifications only after full pagination/validation, retaining app
+	// records for recovery. Use the same stored view as the API, so a missing category
+	// cannot undo an earlier confirmed media classification. Do not enrich apps.
+	visible, err := store.Games(ctx)
+	if err != nil {
+		return 0, nil, errors.New("无法读取 PSN 游戏分类")
+	}
+	byID := map[string]Game{}
+	for _, g := range visible {
+		if g.Platform == "psn" {
+			byID[g.PlatformGameID] = g
+		}
+	}
+	filtered := make([]Game, 0, len(games))
+	for _, g := range games {
+		if _, ok := byID[g.PlatformGameID]; ok {
+			filtered = append(filtered, g)
+		}
+	}
+	games = filtered
 	mappings := map[string]psnTrophyTitle{}
 	mappingFailed := 0
 	for start := 0; start < len(games); start += 5 {

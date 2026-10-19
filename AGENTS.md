@@ -31,6 +31,10 @@ continue without prior conversation history.
   Keep played-list scope explicit, use exact title/trophy IDs, and count shared
   service:npCommunicationId sets once. Owner confirmed first real PSN sync; broader account accuracy and real token expiry
   refresh are still pending.
+- PSN schema v4 retains source category and hides the live-confirmed media categories
+  ps5_web_based_media_app / ps5_native_media_app from all game views/statistics and
+  enrichment. Keep raw rows/snapshots and account isolation; missing category retains
+  prior classification, unknown categories stay visible. Never filter by game name.
 - Achievement details are complete per-game snapshots, joined by platform API name.
   Preserve previous details on missing/invalid personal states or failed schema requests.
   Keep unknown unlock times null; locked hidden content stays collapsed until revealed.

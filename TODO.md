@@ -28,6 +28,7 @@
 - [x] Implement paginated played games, ISO duration, recent time, edition and local cover caching.
 - [x] Map exact title IDs to trophy sets; count shared sets once and persist trophy details.
 - [x] Add PSN settings tab, local token storage, account binding and sync status.
+- [x] Exclude confirmed PSN media-app categories from game views/statistics; retain raw records.
 - [ ] Verify purchased-game list and subscription semantics separately.
 
 ## v0.3 — Epic
@@ -38,7 +39,7 @@
 
 ## Current handoff
 
-- Updated 2026-10-16. Initial local snapshot includes the Steam dashboard, settings,
+- Updated 2026-10-19. Initial local snapshot includes the Steam dashboard, settings,
   artwork repair and per-game achievement archive; no remote push. Go 1.25.14,
   Node 22.23.0; dependencies pinned. Read README and docs/PROJECT.md first.
 - Steam is configured locally by the owner. Do not read/print saved keys, return
@@ -201,3 +202,38 @@
   Codex-managed tool infrastructure is not an application test server.
 - Credentials, local databases, backups, cached media, QA screenshots, builds and
   dependencies remain ignored. No remote push was requested or performed.
+
+### PSN media-application filtering (2026-10-19)
+
+- Owner approved classification-based filtering, keeping cross-platform and distinct
+  version/title-ID entries separate. Live authenticated category probe confirmed
+  bilibili (PPSA06274_00) = ps5_web_based_media_app, Apple Music (PPSA03622_00) =
+  ps5_native_media_app. Existing credentials worked; no reauthentication required.
+  Probe printed only title IDs/names/categories; temporary probe test was removed.
+- Schema v4 adds nullable games.source_category. Full pagination and ID/name
+  validation precede atomic list/category persistence. The two confirmed media
+  categories are omitted by the shared Games view, which feeds dashboard, recent,
+  rankings, library search/pagination and game detail. Sync skips their cover/trophy
+  enrichment. No name matching, ID exclusions, new UI or generic provider framework.
+- Keep all app rows, cover links and achievement snapshots for recovery. Missing/
+  empty classification preserves the prior value; initially unknown and new
+  categories remain visible. An explicit new category can restore a retained row.
+  Account binding checks raw rows, including when all PSN entries are hidden apps.
+- Live sync applied successfully: 10 raw PSN rows retained, 8 visible games; excluded
+  media time 6,071 seconds. Two distinct Genshin title IDs remain separate. PSN run
+  is partial solely for their two missing unique trophy mappings: 0 mapping request,
+  detail/group or cover failures. This is not a credential failure.
+- Backup before migration: ignored data/backups/before-psn-media-filter.db.
+  Verified no prior PSN row IDs were removed. HTTP checks show Steam 64, PSN 8,
+  overall 72; application names are absent from the PSN library.
+- Go tests, race suite, go vet, frontend TS/Vite build and git diff --check passed.
+  Regression coverage includes interrupted/duplicate pagination preserving previous
+  visibility, category persistence/restart and v3 migration, idempotence, unknown/
+  zero semantics, all read views/404 details, distinct versions/platforms, reversible
+  reclassification and app-only account isolation. Known bundle-size warning remains.
+- Local :8080 service was not running at session start; built and started updated
+  ./bin/gameshelf serve. It remains running. Owner subsequently requested committing
+  this filtering implementation, tests and documentation. No remote push requested.
+- Still pending: broader account data comparison, real expired-token refresh and
+  purchase/subscription scope. Future media categories require confirmation before
+  adding them to the small explicit category list; do not exclude unknown categories.
