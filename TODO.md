@@ -31,7 +31,8 @@
 - 已配置 `.github/workflows/ci.yml`：main 推送、PR 和手动触发；Go / 前端独立任务，
   覆盖格式、模块校验、vet、竞态测试、Go 编译及前端锁定安装 / 类型检查 / 构建。
   只读权限、固定 Action 提交、超时和重复运行取消均已配置；不使用真实账号凭据。
-  README 已添加 CI 状态徽章和检查说明。GitHub 首次运行待确认。
+  README 已添加 CI 状态徽章和检查说明。配置已提交并推送，GitHub 首次运行全部通过：
+  https://github.com/yuyudeqiu/game-shelf/actions/runs/39539651658 。
 - 已公开发布至 https://github.com/yuyudeqiu/game-shelf ，远程为 origin，主分支为 main。
   发布前已检查完整历史、忽略规则和已提交截图，未发现真实凭据或数据库；
   提交身份已改为 GitHub 隐私邮箱，原历史备份保留在忽略目录
@@ -50,7 +51,8 @@
 ## 验证与运行
 
 - CI 配置本地检查：Go 格式、模块校验、`go vet ./...`、`go test ./...`、
-  `go test -race -count=1 ./...` 和后端构建通过；前端执行 `npm ci` 后重新构建。
+  `go test -race -count=1 ./...` 和后端构建通过；前端 `npm ci` 与重新构建通过。
+  GitHub Ubuntu 环境两项任务也已通过（前端约 14 秒、Go 约 80 秒）。
 - 本次图表移除：`go test ./...`、`npm --prefix web run build`、
   `git diff --check` 均通过。前端 JS 约 307KB，不再出现原图表包体积提示。
 - 本次浏览器使用演示模式确认两块图表已移除，最近游玩后直接接游戏库；未触发真实同步。
