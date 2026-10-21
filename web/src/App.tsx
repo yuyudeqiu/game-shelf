@@ -15,7 +15,6 @@ import {
   LayoutDashboard,
   LibraryBig,
   LoaderCircle,
-  Monitor,
   RefreshCw,
   Search,
   Settings2,
@@ -25,15 +24,6 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { Button } from "./components/ui/button";
 import SettingsDialog from "./SettingsDialog";
 import GameDialog from "./GameDialog";
@@ -405,17 +395,6 @@ export default function App() {
       ...(dashboard?.platforms.map((p) => p.last_library_sync ?? 0) ?? []),
     ) || null;
   const hasGames = (metrics?.games ?? 0) > 0;
-  const platformData =
-    dashboard?.platforms.map((p) => ({
-      name: labels[p.platform],
-      count: p.count,
-      fill: colors[p.platform],
-    })) ?? [];
-  const topData =
-    dashboard?.top_played.map((g) => ({
-      name: g.name,
-      hours: Number((g.playtime_seconds! / 3600).toFixed(1)),
-    })) ?? [];
 
   function filterPlatform(value: string) {
     setPlatform(value);
@@ -794,106 +773,6 @@ export default function App() {
             )}
           </section>
 
-          <section className="charts-grid" aria-label="游戏统计图表">
-            <article className="chart-card">
-              <div className="chart-heading">
-                <div>
-                  <h2>收藏版图</h2>
-                  <p>各平台已同步游戏数量</p>
-                </div>
-                <Monitor size={17} />
-              </div>
-              {hasGames ? (
-                <div className="platform-chart">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={platformData}
-                      layout="vertical"
-                      margin={{ top: 12, left: 0, right: 34, bottom: 0 }}
-                      barSize={15}
-                    >
-                      <CartesianGrid horizontal={false} stroke="#e3e7e1" />
-                      <XAxis
-                        type="number"
-                        allowDecimals={false}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: "#69746d", fontSize: 10 }}
-                      />
-                      <YAxis
-                        type="category"
-                        dataKey="name"
-                        width={86}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: "#535e57", fontSize: 11 }}
-                      />
-                      <Tooltip
-                        cursor={{ fill: "#f0f3ee" }}
-                        contentStyle={tooltipStyle}
-                        formatter={(value) => [`${value} 款`, "游戏数量"]}
-                      />
-                      <Bar dataKey="count" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <ChartEmpty label="同步后，看看你的收藏分布" />
-              )}
-              <div className="chart-note">同款游戏在不同平台分别计数</div>
-            </article>
-            <article className="chart-card">
-              <div className="chart-heading">
-                <div>
-                  <h2>
-                    时间都给了谁<span className="top-label">TOP 5</span>
-                  </h2>
-                  <p>按已知累计游玩时间排序</p>
-                </div>
-                <Clock3 size={17} />
-              </div>
-              {topData.length ? (
-                <div className="time-chart">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={topData}
-                      layout="vertical"
-                      margin={{ top: 4, left: 0, right: 28, bottom: 0 }}
-                      barSize={9}
-                    >
-                      <XAxis type="number" hide />
-                      <YAxis
-                        type="category"
-                        dataKey="name"
-                        width={140}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: "#535e57", fontSize: 11 }}
-                        tickFormatter={(value) =>
-                          value.length > 20 ? `${value.slice(0, 19)}…` : value
-                        }
-                      />
-                      <Tooltip
-                        cursor={{ fill: "#f0f3ee" }}
-                        contentStyle={tooltipStyle}
-                        formatter={(value) => [`${value} h`, "累计游玩"]}
-                      />
-                      <Bar
-                        dataKey="hours"
-                        fill="#61856d"
-                        radius={[0, 3, 3, 0]}
-                        background={{ fill: "#f0f3ee", radius: 3 }}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <ChartEmpty label="有了时长记录，就有了答案" />
-              )}
-              <div className="chart-note">缺失时长的游戏不参与排行</div>
-            </article>
-          </section>
-
           <section id="library" className="library-section">
             <div className="section-heading">
               <div>
@@ -1210,24 +1089,3 @@ export default function App() {
     </div>
   );
 }
-function ChartEmpty({ label }: { label: string }) {
-  return (
-    <div className="chart-empty">
-      <div>
-        <i />
-        <i />
-        <i />
-        <i />
-        <i />
-      </div>
-      <p>{label}</p>
-    </div>
-  );
-}
-const tooltipStyle = {
-  background: "#ffffff",
-  border: "1px solid #e3e7e1",
-  borderRadius: 8,
-  color: "#252b28",
-  fontSize: 12,
-};
