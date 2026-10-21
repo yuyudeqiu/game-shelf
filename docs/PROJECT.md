@@ -34,6 +34,9 @@ Go 同步命令 → SQLite ← Go HTTP API ← React / Vite 前端。
   空 Key 沿用已有值，修改后无需重启。不得回传或记录密钥、带 Key 的请求 URL。
 - PSN 的 NPSSO 仅交换一次，永不落盘；可续期令牌原子写入 `psn-settings.json`
   （0600），不回传前端。验证账号 ID、校验本地绑定后才写游戏数据。
+- Epic 临时 authorizationCode 只换一次令牌，不落盘；可续期令牌原子保存至
+  `epic-settings.json`（0600）。每次同步在线 verify 身份，绑定检查包含隐藏记录。
+  Epic 普通列表 JSON 不作为无账号验证的导入入口。
 - JSON POST 校验本机 Host / Origin 与自定义请求头，不开放 CORS；OAuth 不跟随重定向。
   平台同步独立运行，失败互不阻塞。凭据操作流程和参数见 README。
 
@@ -70,8 +73,21 @@ Go 同步命令 → SQLite ← Go HTTP API ← React / Vite 前端。
 [奖杯接口](https://psn-api.achievements.app/api-docs/user-trophies)、
 [手动认证](https://psn-api.achievements.app/authentication/authenticating-manually)。
 
-## Epic 接入方向
+## Epic 注意事项
 
-先探测账号再选原生接口或 [Legendary](https://github.com/legendary-gl/legendary) JSON 导入。
-先做列表、名称和封面；检查 Windows / Mac 及不可安装的第三方条目，排除 DLC / 编辑器 / 工具。
-时长和成就无可靠来源时保持 NULL。具体待办统一放在 TODO。
+- Go 原生实现非官方启动器接口，无 Legendary / Python 运行时依赖；参考接口版本见
+  [Epic 接入说明](EPIC.md)。真实账号已完成库同步和时长接口探测，覆盖审计仍待继续。
+- Library 全部分页完成后合并 Windows / Mac assets；重复游标、冲突 ID、缺失字段或
+  任一平台请求失败时不写库。空库响应保守报错，保留旧数据。
+- 游戏 ID 为 namespace、catalogItemId、appName 三元组 JSON 的 SHA-256；
+  Windows / Mac 同一组精确 ID 合并平台信息，第三方不可安装条目仍按 Library 保留。
+- namespace=ue 和 PRIVATE 沙箱跳过；Catalog 主游戏关系及精确 DLC / mods / 编辑器 /
+  工具分类从书架隐藏，原始分类与关系存 source_category JSON，记录仍保留。
+  未知分类可见并报告 partial，不按名字过滤；真实账号分类覆盖仍需核对。
+- Catalog 元数据失败保留旧行，新条目不虚构标题；分类缺失不覆盖已有分类。
+  库条目缺席不删除。封面只使用认可的 Epic CDN 地址并尽量缓存本地。
+- 累计时长读取 Library `playtime/account/{accountId}/all`，totalTime 按秒、artifactId
+  与唯一 appName 精确对应；逐行验证账号、非负整数与重复 ID，不唯一时保持旧值 / NULL。
+  请求失败或缺失记录不置零；明确的 totalTime=0 才是已知零，失败报告 partial。
+- 最近游玩和个人成就暂不请求、保持 NULL。后续独立验证成就 GraphQL；
+  定义总数与 XP 不代表个人已解锁数。

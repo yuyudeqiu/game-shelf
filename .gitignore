@@ -9,3 +9,7 @@
 *.tsbuildinfo
 .DS_Store
 *.log
+
+# Epic renewable credentials / binding, including custom data directories.
+epic-settings.json
+epic-account

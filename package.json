@@ -11,6 +11,7 @@
     "covers": "go run ./cmd/gameshelf covers",
     "dev": "npm --prefix web run dev",
     "test": "go test ./... && npm run build",
+    "sync:epic": "go run ./cmd/gameshelf sync-epic",
     "sync:psn": "go run ./cmd/gameshelf sync-psn"
   }
 }

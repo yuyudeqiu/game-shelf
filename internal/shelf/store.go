@@ -195,7 +195,7 @@ FROM games g LEFT JOIN achievement_sets a ON g.achievement_set_id=a.id ORDER BY 
 		if err := rows.Scan(&g.ID, &g.Platform, &g.PlatformGameID, &g.Name, &g.EditionPlatform, &g.CoverURL, &g.CoverPath, &g.PlaytimeSeconds, &g.LastPlayedAt, &g.AchievementSetID, &g.EarnedCount, &g.TotalCount, &g.SourceScope, &g.UpdatedAt, &g.AchievementUpdatedAt, &g.SourceCategory); err != nil {
 			return nil, err
 		}
-		if g.isPSNMediaApp() {
+		if g.isPSNMediaApp() || g.isEpicNonGame() {
 			continue
 		}
 		games = append(games, g)

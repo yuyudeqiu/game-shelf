@@ -703,15 +703,15 @@ export default function App() {
               </div>
               <div className="setup-copy">
                 <p className="eyebrow">让书架有你的样子</p>
-                <h2>从连接 Steam 开始。</h2>
+                <h2>从连接游戏平台开始。</h2>
                 <p>
-                  填入 Steam Key 和 SteamID，保存后自动同步。
+                  连接 Steam、PlayStation 或 Epic，保存后自动同步。
                   <br />
-                  你的收藏、时长和成就会出现在这里。
+                  收藏会出现在这里，支持的平台还可查看时长与成就。
                 </p>
                 <div className="setup-actions">
                   <Button onClick={() => setSettingsOpen(true)}>
-                    配置 Steam
+                    连接平台
                     <ArrowRight size={14} />
                   </Button>
                   <a href="/?demo=1">
@@ -933,7 +933,7 @@ export default function App() {
                       <p>
                         {hasGames
                           ? "试试其他名称或平台。"
-                          : "连接 Steam 后，你的游戏会自动出现在这里。"}
+                          : "连接游戏平台后，你的游戏会自动出现在这里。"}
                       </p>
                       {(q || platform !== "all") && (
                         <Button
@@ -1050,8 +1050,7 @@ export default function App() {
               </Button>
             </div>
             <p className="settings-description">
-              在平台设置中填写 Steam Key / SteamID64，或连接 PlayStation 的
-              NPSSO，保存后直接同步，无需编辑文件或重启服务。
+              在平台设置中填写 Steam Key / SteamID64、PlayStation NPSSO，或通过 Epic 临时代码连接账号，保存后自动同步。
             </p>
             <Button
               onClick={() => {
@@ -1070,8 +1069,7 @@ export default function App() {
                 等级积分。
               </p>
               <p>
-                PSN 使用社区接口，同步已玩记录；Epic
-                尚待接入。同步失败保留旧记录；封面可能需要联网补充。演示模式的数据独立于你的本地数据库。
+                PSN 使用社区接口，同步已玩记录；Epic 使用非官方启动器接口同步游戏库与累计时长，未返回的指标保持未知。同步失败保留旧记录；封面可能需要联网补充。演示模式的数据独立于你的本地数据库。
               </p>
             </div>
             <div className="modal-footer">

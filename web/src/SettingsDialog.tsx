@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
+import EpicSettingsForm from "./EpicSettingsForm";
 import PSNSettingsForm from "./PSNSettingsForm";
 import { Button } from "./components/ui/button";
 
@@ -25,7 +26,7 @@ export default function SettingsDialog({
   onSaved: () => void;
   demo: boolean;
 }) {
-  const [platform, setPlatform] = useState<"steam" | "psn">("steam");
+  const [platform, setPlatform] = useState<"steam" | "psn" | "epic">("steam");
   const [status, setStatus] = useState<Status | null>(null);
   const [key, setKey] = useState("");
   const [id, setID] = useState("");
@@ -170,14 +171,19 @@ export default function SettingsDialog({
           >
             PlayStation
           </button>
+          <button type="button" disabled={saving} aria-pressed={platform === "epic"} onClick={() => setPlatform("epic")}>
+            Epic Games
+          </button>
         </div>
         {demo ? (
           <div className="data-notes">
-            <p>演示模式不保存配置。回到你的书架后，即可连接 Steam 或 PSN。</p>
+            <p>演示模式不保存配置。回到你的书架后，即可连接 Steam、PSN 或 Epic。</p>
             <a className="settings-text-link" href="/">
               返回我的书架 →
             </a>
           </div>
+        ) : platform === "epic" ? (
+          <EpicSettingsForm onSaved={onSaved} onBusyChange={setSaving} />
         ) : platform === "psn" ? (
           <PSNSettingsForm onSaved={onSaved} onBusyChange={setSaving} />
         ) : (

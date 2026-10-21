@@ -33,8 +33,8 @@ func run() error {
 	if len(os.Args) > 1 {
 		command = os.Args[1]
 	}
-	if command != "serve" && command != "sync" && command != "covers" && command != "sync-psn" {
-		return errors.New("usage: go run ./cmd/gameshelf [serve|sync|sync-psn|covers] [-env .env] [-web web/dist]")
+	if command != "serve" && command != "sync" && command != "covers" && command != "sync-psn" && command != "sync-epic" {
+		return errors.New("usage: go run ./cmd/gameshelf [serve|sync|sync-psn|sync-epic|covers] [-env .env] [-web web/dist]")
 	}
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	envPath := flags.String("env", ".env", "local environment file")
@@ -81,6 +81,30 @@ func run() error {
 	psnSettings, err := shelf.NewPSNSettings(dataDir, store)
 	if err != nil {
 		return err
+	}
+	epicSettings, err := shelf.NewEpicSettings(dataDir, store)
+	if err != nil {
+		return err
+	}
+	epicSync := func() error {
+		log.Print("Epic sync started")
+		if err := epicSettings.Sync(ctx); err != nil {
+			return err
+		}
+		run, err := store.LatestRun(ctx, "epic")
+		if err != nil {
+			return errors.New("could not read Epic sync status")
+		}
+		if run != nil {
+			log.Printf("Epic sync %s: %d games", run.Status, run.ItemsSynced)
+			if run.ErrorSummary != nil {
+				log.Print(*run.ErrorSummary)
+			}
+		}
+		return nil
+	}
+	if command == "sync-epic" {
+		return epicSync()
 	}
 	psnSync := func() error {
 		log.Print("PSN sync started")
@@ -143,16 +167,20 @@ func run() error {
 	if ip == nil || !ip.IsLoopback() {
 		return errors.New("LISTEN_ADDR must use a loopback IP, e.g. 127.0.0.1:8080")
 	}
-	server := &http.Server{Addr: addr, Handler: (&shelf.Server{Store: store, Settings: settings, PSN: psnSettings, DataDir: dataDir, WebDir: *webDir}).Handler(), ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{Addr: addr, Handler: (&shelf.Server{Store: store, Settings: settings, PSN: psnSettings, Epic: epicSettings, DataDir: dataDir, WebDir: *webDir}).Handler(), ReadHeaderTimeout: 5 * time.Second}
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return errors.New("local address unavailable; check LISTEN_ADDR or an already running server")
 	}
 	var workers sync.WaitGroup
-	workers.Add(2)
+	workers.Add(3)
 	go func() {
 		defer workers.Done()
 		runSyncWorker(ctx, "steam", store, interval, func() bool { return settings.Status().Configured }, settings.Wake, syncOnce)
+	}()
+	go func() {
+		defer workers.Done()
+		runSyncWorker(ctx, "epic", store, interval, func() bool { return epicSettings.Status().Configured }, epicSettings.Wake, epicSync)
 	}()
 	go func() {
 		defer workers.Done()

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"math"
 	"mime"
 	"net"
@@ -43,7 +44,7 @@ type Dashboard struct {
 func Summarize(games []Game) Dashboard {
 	d := Dashboard{Recent: []Game{}, TopPlayed: []Game{}, Platforms: []PlatformStatus{
 		{Platform: "steam", Supported: true, Scope: "owned"},
-		{Platform: "psn", Supported: true, Scope: "played"}, {Platform: "epic", Scope: "owned"},
+		{Platform: "psn", Supported: true, Scope: "played"}, {Platform: "epic", Supported: true, Scope: "owned"},
 	}}
 	seen := map[int64]bool{}
 	for _, g := range games {
@@ -91,12 +92,67 @@ type Server struct {
 	Configured bool
 	Settings   *Settings
 	PSN        *PSNSettings
+	Epic       *EpicSettings
 	DataDir    string
 	WebDir     string
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/settings/epic", func(w http.ResponseWriter, r *http.Request) {
+		if s.Epic == nil {
+			writeJSON(w, EpicStatus{LoginURL: EpicLoginURL()})
+			return
+		}
+		writeJSON(w, s.Epic.Status())
+	})
+	mux.HandleFunc("POST /api/settings/epic", func(w http.ResponseWriter, r *http.Request) {
+		if !localWrite(r) {
+			jsonError(w, 403, "仅允许从本机书架页面连接 Epic")
+			return
+		}
+		if s.Epic == nil {
+			apiError(w)
+			return
+		}
+		var input struct {
+			Code string `json:"authorization_code"`
+		}
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&input) != nil {
+			jsonError(w, 400, "Epic 授权格式不正确")
+			return
+		}
+		// Reject trailing JSON as well as unknown fields.
+		var extra any
+		if decoder.Decode(&extra) != io.EOF {
+			jsonError(w, 400, "Epic 授权格式不正确")
+			return
+		}
+		if err := s.Epic.Save(r.Context(), input.Code); err != nil {
+			jsonError(w, 400, err.Error())
+			return
+		}
+		s.Epic.RequestSync()
+		writeJSON(w, s.Epic.Status())
+	})
+	mux.HandleFunc("POST /api/sync/epic", func(w http.ResponseWriter, r *http.Request) {
+		if !localWrite(r) {
+			jsonError(w, 403, "仅允许从本机书架页面同步")
+			return
+		}
+		if s.Epic == nil || !s.Epic.Status().Configured {
+			jsonError(w, 400, "请先连接 Epic")
+			return
+		}
+		if s.Epic.Status().Busy {
+			jsonError(w, 409, "Epic 正在同步，请稍候")
+			return
+		}
+		s.Epic.RequestSync()
+		w.WriteHeader(http.StatusAccepted)
+	})
 	mux.HandleFunc("GET /api/settings/psn", func(w http.ResponseWriter, r *http.Request) {
 		if s.PSN == nil {
 			writeJSON(w, PSNStatus{})
@@ -207,6 +263,9 @@ func (s *Server) Handler() http.Handler {
 		}
 		if s.PSN != nil {
 			d.Platforms[1].Configured = s.PSN.Status().Configured
+		}
+		if s.Epic != nil {
+			d.Platforms[2].Configured = s.Epic.Status().Configured
 		}
 		for i := range d.Platforms {
 			d.Platforms[i].Run, err = s.Store.LatestRun(r.Context(), d.Platforms[i].Platform)
