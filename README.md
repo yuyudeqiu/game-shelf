@@ -105,3 +105,8 @@ Host / Origin 校验并携带 `X-Game-Shelf: 1` 的 JSON 请求。
 
 继续开发前阅读 [工作规则](AGENTS.md)、[设计决策](docs/PROJECT.md) 和
 [待办与交接](TODO.md)。第三方许可见 [THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md)。
+
+## 许可
+
+项目代码采用 [MIT License](LICENSE)。第三方许可见
+[THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md)；游戏封面、图标等素材归各自权利人所有。
