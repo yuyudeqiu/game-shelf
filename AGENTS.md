@@ -1,4 +1,4 @@
-# Game Shelf — agent handoff
+# Game Shelf — working rules
 
 <!-- postman-cli:installation:start -->
 Postman CLI is installed on this device, and can be used for API Engineering work.
@@ -6,49 +6,43 @@ Postman CLI is installed on this device, and can be used for API Engineering wor
 
 ## Start here
 
-Read `README.md`, `docs/PROJECT.md`, and `TODO.md` before making changes. Update the
-TODO and its handoff section after each meaningful work session so a new chat can
-continue without prior conversation history.
+Read [README](README.md), [design decisions](docs/PROJECT.md) and [TODO](TODO.md)
+before changes. After meaningful work, update TODO's current handoff in place;
+keep pending work, current state and verification, not a growing session diary.
 
-## Agreed scope
+## Scope
 
-- Personal, local-only, read-only gaming dashboard. Go + SQLite backend.
-- React + TypeScript + Vite + Tailwind + shadcn-style components + Recharts frontend.
-- Steam first, PSN second, Epic library third. One account per platform.
-- No cross-platform deduplication, user system, editing, recommendations, AI, cloud
-  deployment, complex permissions, or elaborate domain architecture.
-- Unknown values must remain null, never silently become zero. Totals include
-  known values only and must expose coverage. Platform entries count separately.
-- Keep previous successful data on sync failures; never delete on a partial list.
-- The user requested in-page Steam settings. Accept user-entered credentials via
-  local-only JSON POST, persist atomically to ignored data/settings.json (0600),
-  and apply without restarting. Saved settings override initial env credentials.
-  Never return stored keys to the frontend, print them, commit them, or request
-  them in chat. Empty key on save preserves the existing key. Game data stays read-only.
-- PSN uses an unofficial Sony API. NPSSO is exchanged once and never persisted;
-  renewable tokens are saved atomically to ignored psn-settings.json (0600), never
-  returned to the frontend or logged. Bind verified account ID before game writes.
-  Keep played-list scope explicit, use exact title/trophy IDs, and count shared
-  service:npCommunicationId sets once. Owner confirmed first real PSN sync; broader account accuracy and real token expiry
-  refresh are still pending.
-- PSN schema v4 retains source category and hides the live-confirmed media categories
-  ps5_web_based_media_app / ps5_native_media_app from all game views/statistics and
-  enrichment. Keep raw rows/snapshots and account isolation; missing category retains
-  prior classification, unknown categories stay visible. Never filter by game name.
-- Achievement details are complete per-game snapshots, joined by platform API name.
-  Preserve previous details on missing/invalid personal states or failed schema requests.
-  Keep unknown unlock times null; locked hidden content stays collapsed until revealed.
-  PSN uses Accept-Language zh-Hans for Simplified Chinese; zh-CN falls back to English.
-  PSN group metadata has separate timestamps (schema v3); updating group names must
-  not make personal unlock snapshots appear fresher. Preserve names on failed fetches.
-- Demo data must be explicitly labeled and must not enter the real database.
+- Personal, local-only, read-only dashboard; Go + SQLite and React / TypeScript /
+  Vite / Tailwind / shadcn-style components. One account per platform.
+- Steam first, PSN second, Epic next. No cross-platform deduplication, game editing,
+  user system, recommendations, AI, cloud deployment, complex permissions or
+  elaborate domain architecture.
+- Use standard-library HTTP/routing and a small SQL repository. No ORM, job system,
+  provider plugin framework or authentication system.
 - No agent delegation unless explicitly requested by the user.
 
-## Working rules
+## Data and credentials
 
-Use the Go standard library for HTTP/routing and a small SQL repository. Do not add
-an ORM, job system, provider plugin framework, or authentication system to v0.1.
-Verify persistence, null/zero semantics, idempotent sync and failure preservation
-with meaningful tests. Run `go test ./...` and `npm --prefix web run build` before
-handoff. Live account checks require locally configured credentials; clearly report
-when only fixture-based checks were possible.
+- Unknown remains NULL, never silently zero; totals expose coverage. Platform/title
+  entries stay separate; shared trophy sets count once. No deletion on partial lists
+  or failed syncs; preserve prior successful data and complete detail snapshots.
+- Bind verified accounts before game writes; include retained hidden app rows in
+  isolation checks. Exact title/API IDs only; no name-based mapping or name-based
+  app filtering.
+- Never return stored secrets to the frontend, log/commit them, or request credentials
+  in chat. This applies to both Steam and PSN.
+- Steam settings: local JSON POST, atomic ignored settings.json (0600), hot apply,
+  saved values override initial env, empty Key retains the old Key.
+- PSN: transient NPSSO exchange only; atomic ignored psn-settings.json (0600) for
+  renewable tokens. If reauthentication is needed, tell the user.
+- Keep hidden details collapsed until revealed and unknown unlock times NULL.
+  PSN uses zh-Hans; group metadata freshness stays separate from personal snapshots.
+  Application category rules and failure semantics are specified in PROJECT.md.
+- Demo data must be labeled, isolated from the real database and free of invented details.
+
+## Verification
+
+Use meaningful tests for persistence, NULL/zero semantics, idempotence and failure
+preservation. Run `go test ./...` and `npm --prefix web run build` before handoff.
+Live account checks need locally configured credentials; distinguish fixture checks
+from live verification. Current known gaps belong in TODO, not these working rules.

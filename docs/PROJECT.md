@@ -1,163 +1,77 @@
-# Project decisions
+# 设计决策
 
-Last updated: 2026-10-19 (Asia/Shanghai).
+更新：2026-10-21。使用说明见 [README](../README.md)，当前进度见 [TODO](../TODO.md)。
+这里只记录长期有效的设计和接口注意事项，历史过程查 Git。
 
-## Goal
+## 架构与边界
 
-A personal gaming dashboard worth opening daily: sync games from Steam, PSN and
-Epic where possible, store locally, browse a polished read-only web dashboard.
-The user approved starting implementation after research. Keep the scope small.
+Go 同步命令 → SQLite ← Go HTTP API ← React / Vite 前端。
 
-## Interface
+- 本地个人只读书架，每个平台一个账号；游戏数据只读，设置接口允许保存凭据及触发同步。
+- Go 标准库 HTTP / 路由、小型 SQL repository；前端使用 TypeScript、Tailwind、
+  shadcn 风格组件。Go 提供构建后的静态文件，开发时由 Vite 代理。
+- 只监听 loopback；封面尽量缓存本地，详情文本和状态从 SQLite 读取。
+- 不引入账号系统、跨平台合并、编辑游戏、推荐 / AI、云部署或复杂框架。
 
-- Top: per-platform sync status and last successful update.
-- Summary: synced platform entries, known total playtime with coverage, earned
-  achievements/trophies with platform breakdown and coverage.
-- Recently played: horizontal record cards ordered by actual last-played timestamps.
-  Small contained artwork on the left; title/platform/version/date and prominent
-  cumulative hours plus earned/total counts on the right. Count-based progress and
-  percentage accompany known nonempty sets; unknown values remain dashes and
-  confirmed empty sets are labeled. Two desktop columns, one at <=1100px.
-- Two charts: platform game counts and top five games by known playtime.
-- Library: cover, name, platform/version, playtime, earned/total, last played.
-  Name search, platform filter, sorting and pagination.
-- Dark default, restrained platform colors, responsive layout and empty/error states.
-- No fabricated daily activity charts; there is no historical snapshot table.
+## 数据与失败保留
 
-## Architecture
+- 当前 schema v4：`games`、`achievement_sets`、`sync_runs`、`achievement_details`。
+  平台 ID 为字符串，游戏按 `(platform, platform_game_id)` upsert，不按名称匹配。
+- 时间为 UTC Unix 秒，时长为整数秒；NULL 是未知，0 是已知零。
+  总量只汇总已知数据并暴露覆盖率；共享成就集只计一次，不把等级积分当奖杯数量。
+- 完整拉取并验证分页后才保存库列表；错误、空列表或部分响应不会清空旧记录。
+  不因条目本次缺席而删除，因此收藏是累积同步口径。
+- 成就详情必须是按 API ID 完整连接定义与个人状态的快照；不完整时保留上次详情。
+  数量接口可独立更新摘要；未知解锁时间保持 NULL。
+- 详情通常在数据变化或超过 24 小时后刷新。PSN 分组元数据有独立时间戳，
+  更新名称不能让个人解锁记录显得更新；分组请求失败保留旧名称。
+- 隐藏内容需显式揭示；状态只在当前详情会话保留，并参与搜索，关闭后重置。
+  演示数据与真实数据库隔离，不虚构逐条详情或每日活动历史。
 
-Go sync commands → SQLite ← read-only Go HTTP API ← React/Vite frontend.
-Go serves built static files for local use; Vite proxies the API in development.
-Listen on loopback by default. Cover images are cached locally when possible.
-No cloud hosting, external metadata subscriptions, or OpenAI API.
+## 本地设置
 
-The user subsequently requested browser-based Steam configuration. Platform
-settings accept Key and SteamID64, store them atomically in ignored
-data/settings.json (0600), and trigger background sync without restart. Read APIs
-expose only has_key, SteamID and status. Empty Key retains the saved value. Initial
-env configuration remains a fallback; saved UI settings take priority. JSON write
-endpoints require a local Host/Origin and custom header, with no CORS allowance.
-Existing Steam data prevents changing to another account in the same DATA_DIR.
+- Steam 设置原子写入 `settings.json`（0600）；页面保存值优先于初始环境变量。
+  空 Key 沿用已有值，修改后无需重启。不得回传或记录密钥、带 Key 的请求 URL。
+- PSN 的 NPSSO 仅交换一次，永不落盘；可续期令牌原子写入 `psn-settings.json`
+  （0600），不回传前端。验证账号 ID、校验本地绑定后才写游戏数据。
+- JSON POST 校验本机 Host / Origin 与自定义请求头，不开放 CORS；OAuth 不跟随重定向。
+  平台同步独立运行，失败互不阻塞。凭据操作流程和参数见 README。
 
-Four tables: games, achievement_sets, sync_runs, achievement_details. Platform IDs are strings.
-Schema v2 adds one per-game JSON snapshot table for the read-only achievement archive;
-v1 data is migrated without resetting the library. Counts and detail snapshots are
-saved atomically on complete responses. The API-name join must be complete before
-replacing previous details; count-only fallback may still update summary counts.
-Details contain localized names/descriptions, icons, hidden flags, personal unlock
-state and optional unlock timestamps. No inferred partial progress or rarity.
-Schema v3 adds nullable groups_json/groups_updated_at columns to achievement_details.
-Group metadata updates independently of personal unlock snapshots and preserves old
-metadata on network failure. Missing group timestamps cause a backfill on next sync;
-subsequent metadata refreshes occur daily or alongside changed achievement details.
-No new tables; overview totals are unaffected by group rows.
-Schema v4 adds nullable games.source_category, preserving all existing rows and
-snapshots. PSN persists categories only after a fully validated played list, then
-excludes the two live-confirmed media categories ps5_web_based_media_app and
-ps5_native_media_app from the shared Games read view and trophy/cover enrichment.
-Applications remain stored for recovery; list/search/detail/dashboard all use that
-view. Missing or empty category updates preserve prior classification; new unknown
-categories remain visible. Never classify by title name, trophy availability or
-title ID. Explicit later reclassification restores visibility. Retained application
-rows still participate in account-binding checks. No new settings or management UI.
-PSN UI displays content-group cards with unlocked/total count progress, four grade
-counts and filters. Content group, grade, unlocked state and search compose; unknown
-group/grade values remain explicitly unknown. Names come from getTitleTrophyGroups.
+## Steam 注意事项
 
-Click recent/library games to open an accessible modal, filter/search achievements,
-and explicitly reveal locked hidden content individually or with a game-wide show/hide toggle.
-Reveal state lives in the game dialog, persists across filters/groups, and makes revealed
-names/descriptions searchable. Closing the dialog resets it; no database writes.
-The game-wide reveal toggle sits beside the achievement/trophy detail-list heading,
-after group/grade/state/search filters and before results (including empty results),
-with a stacked heading/button on mobile. It does not sit above PSN content groups.
-Hidden rows place the individual reveal action in the description line, keeping
-the same title-plus-description structure as revealed rows; long text wraps naturally.
-Demo mode has no fabricated details.
-Times are UTC Unix seconds, durations are integer seconds. SQLite NULL means
-unknown; known zero is distinct. Shared PSN trophy sets must be counted once.
-Upsert on (platform, platform_game_id); never merge by name or across platforms.
+- `GetOwnedGames` 获取库与时长，包含已玩免费游戏；最近游玩字段可能缺失。
+  隐私 / 网络错误不是空库。`GetPlayerAchievements` 与 schema 按 API name 连接。
+- schema 可确认无成就；接口失败不可推断为零。中文请求 `l=schinese`。
+- 固定封面地址仅作初始猜测；失败时使用商店 appdetails 的 `header_image`，
+  保留解析后的真实 URL，避免下次同步重新覆盖成无效地址。
 
-## Platform research and next integration choices
+参考：[Web API](https://partner.steamgames.com/doc/webapi_overview)、
+[IPlayerService](https://partner.steamgames.com/doc/webapi/IPlayerService)、
+[ISteamUserStats](https://partner.steamgames.com/doc/webapi/ISteamUserStats)。
 
-### Steam / v0.1
+## PSN 注意事项
 
-Use the public `https://api.steampowered.com` host with a personal Web API key and
-SteamID64. `GetOwnedGames` supplies library and playtime; include app info and
-played free games. `rtime_last_played` is optional. `GetPlayerAchievements`
-supplies per-game counts; schema lookup can distinguish known no-achievements.
-Library/privacy errors are not an empty library. Achievements are best effort,
-lower concurrency, and must preserve previous counts on transient failures.
-Do not expose API request URLs in errors because keys are query parameters.
+- 使用基于 [psn-api](https://github.com/achievements-app/psn-api/tree/1e9d9a806fcd884a4ddee8086bfe92594611da9f/src)
+  的 Go 原生非官方接口实现；不运行 Node 子进程。参考版本及许可见
+  [第三方声明](THIRD_PARTY_NOTICES.md)。
+- 已玩列表不等于购买 / 订阅库。按精确 title ID 查奖杯映射，每批五个、失败时逐个回退；
+  无映射或多映射保持未知，不用名称猜测，也不创建仅有奖杯的虚拟游戏条目。
+- 奖杯集键为 `service:npCommunicationId`；数量合计白金 / 金 / 银 / 铜。
+  定义与个人状态按 trophyId 连接，跨全部分组分页获取；分组名称来自 getTitleTrophyGroups。
+- 简体中文必须用 `Accept-Language: zh-Hans`；实测 `zh-CN` / `zh-TW` 回退到英语。
+  奖杯更新时间不能作为游玩时间；强制刷新文本仍须保留失败保护。
+- 保留原始 `source_category`；仅隐藏已确认的 `ps5_web_based_media_app`（bilibili）
+  和 `ps5_native_media_app`（Apple Music）。所有游戏视图 / 统计及补全流程统一排除它们，
+  原始条目和快照不删除，账号绑定检查仍包含隐藏条目。
+- 缺失 / 空分类沿用旧值；初次未知和新分类继续显示，明确重新分类后可恢复展示。
+  不按名称、title ID 或有无奖杯判断应用。
 
-Artwork: fixed CDN paths are only an initial guess. On failure, resolve the
-header_image from public Steam store appdetails (no API key), since newer artwork
-may include a hash directory. Cache it and retain the resolved source across syncs.
-`npm run covers` backfills missing cached covers without syncing personal metrics.
+参考：[用户接口](https://psn-api.achievements.app/api-docs/users)、
+[奖杯接口](https://psn-api.achievements.app/api-docs/user-trophies)、
+[手动认证](https://psn-api.achievements.app/authentication/authenticating-manually)。
 
-References:
-- https://partner.steamgames.com/doc/webapi_overview
-- https://partner.steamgames.com/doc/webapi/IPlayerService
-- https://partner.steamgames.com/doc/webapi/ISteamUserStats
+## Epic 接入方向
 
-### PSN / v0.2 — first live sync and group UI verified
-
-Native Go HTTP integration based on achievements-app/psn-api; no Node subprocess
-or new runtime dependency. PSN settings are independent of Steam. A 64-character
-NPSSO is exchanged transiently, not persisted. Atomic 0600 psn-settings.json stores
-renewable tokens and verified account ID; psn-account prevents mixing accounts.
-Tokens are never exposed by status APIs; response bodies and transport URLs are
-not forwarded in errors. OAuth redirects are not followed. Origin/Host JSON-write
-protection is shared with Steam. Independent workers use the same 6h default.
-
-The played library is fully paginated and validated before upsert. Edition labels
-are persisted. Stable title IDs map through getUserTrophiesForSpecificTitle, in
-batches of five with individual fallback. Ambiguous or absent maps remain unknown;
-there is no game-name matching and no trophy-only synthetic game entry. This means
-historical PS3/Vita titles absent from the played list are not imported yet.
-Counts sum bronze/silver/gold/platinum; shared keys are service:npCommunicationId.
-Definitions and earned states are paginated across all groups and joined by trophyId.
-Complete snapshots reuse the existing detail table; failures retain old snapshots.
-Details refresh on count/playtime changes or after 24h, using snapshot timestamps
-rather than count timestamps. Cover caching now supports PSN image hosts too.
-
-PSN locale: use Accept-Language zh-Hans for Simplified Chinese. Real responses
-for Ghost of Tsushima verified zh-CN/zh-TW silently return English, zh-Hans returns
-Simplified, and zh-Hant returns Traditional. Steam continues using l=schinese.
-PSNSettings.RefreshDetails and sync-psn -refresh-details bypass the 24h cache to
-refresh existing texts/groups while preserving old snapshots on failure. Normal
-sync remains cached. No fabricated or machine-translated trophy descriptions.
-
-Verified reference source at commit 1e9d9a806fcd884a4ddee8086bfe92594611da9f:
-https://github.com/achievements-app/psn-api/tree/1e9d9a806fcd884a4ddee8086bfe92594611da9f/src
-See docs/THIRD_PARTY_NOTICES.md for license attribution.
-
-Unofficial endpoints documented by achievements-app/psn-api. NPSSO bootstraps
-access/refresh tokens; expiry can require local reauthentication. Start with
-played games and trophies. `getUserPlayedGames` includes title ID, artwork,
-ISO-8601 duration and last-played time. `getUserTitles` provides trophy sets.
-`getPurchasedGames` also exists, but purchase/subscription/played list semantics
-must be checked against the account. Use exact platform mappings between title
-IDs and npCommunicationId; no name matching. Trophy update time is not play time.
-
-References:
-- https://psn-api.achievements.app/api-docs/users
-- https://psn-api.achievements.app/api-docs/user-trophies
-- https://psn-api.achievements.app/authentication/authenticating-manually
-
-### Epic / v0.3
-
-Legendary implements library pagination, catalog artwork, authentication and some
-achievement queries. Start with library/name/artwork only; time and achievements
-may remain null. Filter DLC/editor/tool entries. On macOS Legendary defaults to
-Mac entries: check Windows and non-installable third-party entries too.
-Native Go integration or an explicit Legendary JSON import can be chosen later.
-
-Reference: https://github.com/legendary-gl/legendary
-
-## Definition of done for the first usable release
-
-Real Steam data survives restarts and failed syncs; repeat sync has no duplicates;
-missing fields render as unknown; all overview/list/chart interactions work; one
-documented local startup command; no credentials exposed. Account-level accuracy
-must be verified after the owner configures credentials locally.
+先探测账号再选原生接口或 [Legendary](https://github.com/legendary-gl/legendary) JSON 导入。
+先做列表、名称和封面；检查 Windows / Mac 及不可安装的第三方条目，排除 DLC / 编辑器 / 工具。
+时长和成就无可靠来源时保持 NULL。具体待办统一放在 TODO。

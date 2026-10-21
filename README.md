@@ -1,12 +1,7 @@
 # Game Shelf
 
-一个留在本地的个人 Gaming Dashboard。Go + SQLite，React + Vite + Tailwind，
-shadcn 风格组件和 Recharts。Steam 已实现；PSN 已完成首次真实同步与奖杯分组验证；Epic 后续接入。
-
-## 新对话从哪里继续
-
-先读 [AGENTS.md](AGENTS.md)、[项目背景与决策](docs/PROJECT.md) 和 [TODO.md](TODO.md)。
-TODO 最下方记录当前进度、验证结果、下一步和尚未确认的事项。
+本地个人游戏书架：同步 Steam、PSN，查看游戏库、累计时长、成就 / 奖杯。
+Epic 尚未接入。Go + SQLite 后端，React + TypeScript + Vite 前端。
 
 ## 快速启动
 
@@ -17,159 +12,96 @@ npm run setup
 npm start
 ```
 
-打开 http://127.0.0.1:8080 。无需凭证即可查看空书架；在页面里选择“演示书架”，
-或访问 http://127.0.0.1:8080/?demo=1 查看独立示例数据。演示数据不写入 SQLite，
-不会冒充真实同步；演示封面借用 Steam 图片，部分平台版本仅作布局示意。
+打开 http://127.0.0.1:8080 。未连接账号时显示空书架；点击“演示书架”或访问
+[演示模式](http://127.0.0.1:8080/?demo=1) 查看示例，演示数据不写入数据库。
+演示封面借用 Steam 图片，部分平台版本仅作布局示意。
 
-## 连接 Steam
+## 连接平台
 
-启动后，点击页面右上角的齿轮或侧栏「平台设置」：
+### Steam
 
-1. 填写 Steam API Key 和 17 位 SteamID64（不是昵称）。
-2. 点击「保存并同步」。配置立即生效，无需重启。
-3. 再次打开时 Key 不会回传，显示「已保存」；留空可沿用，填写新 Key 可替换。
+1. 打开「平台设置 → Steam」，填写 API Key 和 17 位 SteamID64（不是昵称）。
+2. 点击「保存并同步」，配置立即生效，无需重启。
+3. Key 再次打开时不会回传；留空沿用，填入新值替换。同步结果看首页平台状态。
 
-设置中提供 [Steam API Key 页面](https://steamcommunity.com/dev/apikey) 的入口。
-确认 Steam 的游戏详情允许接口访问。不要把 Key 粘贴到聊天或提交到 Git。
-保存表示已保存配置，实际连通性由后台同步验证；错误可在首页同步状态查看。
-已有账号数据时不能直接换 SteamID，以免混合收藏；新账号请用新的 DATA_DIR。
+设置内有 [API Key 申请入口](https://steamcommunity.com/dev/apikey)；游戏详情需允许接口访问。
+也可在 `.env` 配置初始 `STEAM_API_KEY` / `STEAM_ID`，页面保存的配置优先。
 
-可选：仍支持 `.env` 中的 `STEAM_API_KEY` / `STEAM_ID` 作为初始配置。
-页面保存的配置优先于这两个环境变量。DATA_DIR、端口和同步周期仍可用 `.env` 设置。
+### PlayStation / PSN
 
-服务启动时，如果上次库同步已超过 `SYNC_INTERVAL`（默认 6h），在后台刷新。
-运行期间每分钟检查是否到期；浏览器每 60 秒刷新本地视图，同步中每 5 秒刷新。
-库同步失败时，后台最多每 15 分钟重试一次（自定义周期更短时采用该周期）。
-也可手动执行：
+1. 在浏览器登录 [PlayStation](https://www.playstation.com/)。
+2. 用同一浏览器打开 [NPSSO 页面](https://ca.account.sony.com/api/v1/ssocookie)。
+3. 复制 `npsso` 的 64 位值，粘贴到「平台设置 → PlayStation」，点击「连接并同步」。
 
-```sh
-npm run sync
-```
+不需要 Sony 密码。NPSSO 仅用于交换令牌，本身不保存；账号 ID 自动验证。
+服务支持自动刷新短期令牌，登录失效时在页面重新填写 NPSSO。
+两平台的凭据都只在本机输入，不要发到聊天或提交到 Git。
+同一数据目录每个平台绑定一个账号，换账号需使用新的 `DATA_DIR`。
 
-页面上的“刷新视图”只重新读取 SQLite；“平台设置 → 立即同步”可向 Steam 发起同步。
-大库首次补成就与图片需要时间；库列表会先保存，最近游玩的游戏优先补全。
-单个游戏的成就默认最多每天重查一次，游玩时长变化时会提前更新；缺少逐条详情的游戏也会在下次同步时补齐。
+## 浏览与同步
 
-最近游玩使用横向记录卡：左侧小封面，右侧突出累计时长、成就 / 奖杯数量和完成度；
-桌面两列，窄屏单列，未知数据保持未知。
-点击最近游玩卡片或游戏列表中的名称，可打开游戏详情：查看逐条成就名称、说明、图标、
-已解锁 / 未解锁状态和解锁日期；支持搜索和状态筛选。中文内容以 Steam 实际提供为准。
-未解锁的隐藏成就默认收起，可逐条展开，或在筛选、搜索下方的「成就详情 / 奖杯详情」标题旁
-点击「显示全部隐藏内容」，一键展开当前游戏的所有隐藏成就/奖杯；再点可全部收起。窄屏时按钮在详情标题下方。
-展开后可搜索真实名称与说明。开关仅在当前详情会话生效，关闭再打开恢复默认收起。详情保存在 SQLite，读取详情不会请求 Steam；
-接口不可用时保留上次快照并显示其更新时间。成就图标仍通过 Steam CDN 加载，离线时显示占位图。
+- 最近游玩卡片突出累计时长和成就进度；点击卡片或游戏名称打开详情。
+- 详情可搜索、筛选和查看解锁日期；PSN 还支持本体 / 附加分组与奖杯等级。
+  在列表标题旁显示 / 收起全部隐藏内容；关闭详情后恢复收起。
+- 「刷新视图」只读取本地数据库；「平台设置 → 立即同步」向对应平台取新数据。
+- 默认每 6 小时自动同步，两平台独立运行；失败默认最多每 15 分钟重试一次，
+  自定义同步周期更短时采用该周期。页面每 60 秒刷新，同步中每 5 秒刷新。
+- 首次同步先保存列表，再补详情与封面；详情通常缓存 24 小时，数据变化时提前刷新。
+  读取详情不请求平台；图标仍从平台 CDN 加载，离线时可能显示占位图。
 
-图片固定地址失效时，会查询 Steam 商店返回的实际封面 URL（部分游戏含额外的素材目录），
-下载后缓存本地并保留解析后的地址。也可以只修补缺失封面，无需重新同步游戏数据：
+| 命令 | 用途 |
+| --- | --- |
+| `npm run sync` | 同步 Steam |
+| `npm run sync:psn` | 同步 PSN |
+| `npm run sync:psn -- -refresh-details` | 跳过 PSN 详情缓存，重取奖杯文本和分组 |
+| `npm run covers` | 仅修补缺失封面，不同步游戏指标 |
 
-```sh
-npm run covers
-```
+## 数据口径与限制
 
-## 连接 PlayStation / PSN
+- 同款游戏跨平台、不同 title ID 分别保留，不合并。总数是已同步平台条目数。
+- 未知值显示为未知，不当作零。时长只合计已知值并显示覆盖率；共享奖杯集只计一次。
+- Steam 同步可访问的游戏库；PSN 使用非官方接口，同步**已玩列表**，不代表完整购买库。
+  PS3 / Vita、购买与订阅范围，以及更广泛的账号准确性仍待验证。
+- PSN 已确认的媒体应用（如 bilibili、Apple Music）退出展示和统计，原始记录仍保留。
+  未知分类不直接排除。具体分类规则见 [设计决策](docs/PROJECT.md)。
+- 同步失败或部分返回保留旧数据，退款 / 库移除不会自动删除，所以数量可能与平台当前不同。
+  `partial` 表示部分数据未获取；库同步时间与成就详情更新时间可能不同。
+- 进度按成就 / 奖杯数量计算；奖杯更新时间不当作游玩时间。不生成无历史数据支撑的每日曲线。
 
-刷新页面，进入「平台设置 → PlayStation」。不需要 Sony 密码或 Steam Key：
+## 本地配置与备份
 
-1. 在浏览器中登录 [PlayStation](https://www.playstation.com/)。
-2. 在同一浏览器打开 [Sony NPSSO 页面](https://ca.account.sony.com/api/v1/ssocookie)。
-3. 只复制 JSON 中 `npsso` 对应的 64 位值，粘贴到本机设置，点击「连接并同步」。
+| 配置 / 文件 | 用途 |
+| --- | --- |
+| `LISTEN_ADDR=127.0.0.1:8080` | 监听地址，只允许 loopback |
+| `DATA_DIR=./data`、`SYNC_INTERVAL=6h` | 数据目录与同步周期，可在 `.env` 设置 |
+| `data/gameshelf.db`、`data/covers/` | SQLite（含 WAL 伴随文件）与封面缓存 |
+| `data/settings.json`、`data/psn-settings.json` | Steam 配置、PSN 令牌，权限 0600，不回传密钥 |
+| `data/steam-account`、`data/psn-account` | 账号绑定 |
 
-NPSSO 是登录凭证，不要发送到聊天。服务用它向 Sony 换取令牌并验证账号，NPSSO
-本身不落盘；可刷新的 access/refresh token 存在忽略的 `data/psn-settings.json`，
-权限为 0600，不向前端回传。账号 ID 从 Sony 返回的数据确认，不需要手动输入。
-同一书架已有 PSN 数据时拒绝更换账号；同账号重新连接可以更新登录。
-正常运行时自动刷新短期令牌；刷新令牌失效后重新获取 NPSSO。
+`.env` 不执行 shell，也不展开变量。备份前停止服务和同步命令，再复制整个 `data/`；
+不要只复制正在写入的 db 主文件。
 
-首版同步接口返回的**已玩游戏**：PS4 / PS5 版本标识、封面缓存、已知时长和最近游玩；
-并按精确 title ID 读取奖杯映射、数量及逐条详情（含白金/金/银/铜、隐藏和解锁时间）。
-DLC 奖杯通过 `all` 接口获取；多个条目共享奖杯集时总数只算一次。
-PSN 请求简体中文（`zh-Hans`），读取平台提供的奖杯名称、说明和分组名称。
-同步保留接口返回的分类；已确认的 PS5 媒体应用分类
-`ps5_web_based_media_app`（如 bilibili）和 `ps5_native_media_app`（如 Apple Music）
-不进入书架、搜索、游戏详情或首页统计，也不请求奖杯详情。旧记录仍保留在本地，
-不删除。分类缺失时沿用上次分类；首次缺失或其他未知分类继续显示，不按名称或奖杯有无猜测。
-详情面板按本体和 PSN 返回的附加分组名称显示各组进度；可组合分组、白金/金/银/铜
-等级、解锁状态和搜索筛选。分组名称暂不可用时显示分组编号，缺少 ID 时显示分组未知，
-不猜测 DLC 名称。进度百分比按已解锁奖杯数量计算。
-分组元数据单独缓存，更新名称不会修改个人解锁记录的更新时间；失败保留旧名称。
-无唯一映射、缺失字段或错误不会变成零，也不会覆盖已有完整详情。
-奖杯更新时间不会作为最近游玩时间。PS3 / PS Vita 覆盖尚未验证；
-不包含未玩过的完整购买库，订阅/购买口径后续单独验证。
-
-后端使用 Go 原生 HTTP，根据 [psn-api 社区项目](https://github.com/achievements-app/psn-api)
-实现非官方接口，可能随 Sony 变动。当前已通过模拟接口、首次真实同步和奖杯分组 UI 验证；库范围、时长等完整口径仍待核对。
-Steam 与 PSN 各自定时运行，一个平台失败不会阻塞另一个。也可运行：
+## 开发
 
 ```sh
-npm run sync:psn
+npm run serve  # 终端 1：Go API
+npm run dev    # 终端 2：Vite，代理到 :8080
+npm test       # Go 测试、前端类型检查和生产构建
 ```
 
-需要立即重取已有奖杯文本（跳过 24 小时详情缓存，并执行正常 PSN 同步）时：
+后端改动需重启服务；Vite 前端支持热更新。Go 服务使用构建后的 `web/dist`。
 
-```sh
-npm run sync:psn -- -refresh-details
-```
+| HTTP 接口 | 用途 |
+| --- | --- |
+| `GET /api/dashboard` | 指标、覆盖率、平台状态、最近游玩与时长排行 |
+| `GET /api/games` | `q`、`platform`、`sort`、`page` 查询，每页 20 条 |
+| `GET /api/games/{id}`、`GET /covers/{filename}` | 本地详情快照、缓存封面 |
+| `GET /api/settings/{steam,psn}` | 配置状态，不含密钥 / 令牌 |
+| `POST /api/settings/{steam,psn}` | 保存平台配置并安排同步 |
+| `POST /api/sync/{steam,psn}` | 安排平台同步 |
 
-这也会刷新分组名称；请求失败仍保留上次完整数据。普通定时同步继续使用缓存。
+`sort` 支持 `recent` / `name` / `playtime` / `achievements`；POST 仅接受符合本机
+Host / Origin 校验并携带 `X-Game-Shelf: 1` 的 JSON 请求。
 
-
-## 本地文件
-
-- `data/gameshelf.db`：SQLite 数据（含 WAL 伴随文件）。
-- `data/covers/`：已缓存的封面；封面可能因下架/素材变化而不可用，有占位图。
-- `data/steam-account`：SteamID 绑定，避免切换账号后混合数据。换账号请用新的 `DATA_DIR`。
-- `data/settings.json`：Steam 配置，文件权限 0600；API 不返回 Key。
-- `data/psn-settings.json`：PSN 登录令牌，文件权限 0600；API 不回传令牌。
-- `data/psn-account`：PSN 账号绑定，防止混入其他账号的数据。
-- `.env`：可选的初始凭证及运行参数，不执行 shell，不展开变量。
-
-默认只允许绑定 loopback IP。`LISTEN_ADDR=127.0.0.1:8080` 可改端口；
-`DATA_DIR=./data`、`SYNC_INTERVAL=6h` 可调整。开发期不需要 Docker、Redis 或云服务。
-备份时先停止服务和同步命令，再复制 `data/`；不要只复制正在写入的 db 主文件。
-
-## 开发与验证
-
-```sh
-# 终端 1：Go API（无需先构建前端）
-npm run serve
-# 终端 2：Vite，代理 API 到 :8080
-npm run dev
-
-# 后端回归测试 + 前端类型检查和生产构建
-npm test
-```
-
-修改后端后重启 `serve`；Vite 前端支持热更新。
-
-游戏数据只读接口：
-
-- `GET /api/dashboard`：指标、覆盖率、平台状态、最近游玩、时长排行。
-- `GET /api/games?q=&platform=all&sort=recent&page=1`：每页 20 条。
-  `sort` 支持 `recent` / `name` / `playtime` / `achievements`。
-- `GET /api/games/{id}`：游戏信息、本地成就详情快照及其更新时间；尚未获取与确认无成就分别展示。
-- `GET /covers/{filename}`：本地封面。
-
-配置与同步接口（仅允许本机页面发起 JSON 请求）：
-
-- `GET /api/settings/steam`：SteamID、是否有 Key、配置来源和同步状态，不含 Key。
-- `POST /api/settings/steam`：保存并安排同步；空 Key 表示沿用已保存的 Key。
-- `POST /api/sync/steam`：安排一次 Steam 同步。
-- `GET /api/settings/psn`：PSN 账号 ID、是否已连接、同步忙碌状态，不含令牌。
-- `POST /api/settings/psn`：接收 NPSSO，验证并保存登录，安排同步；留空可沿用。
-- `POST /api/sync/psn`：安排一次 PSN 同步。
-
-## 数据口径与边界
-
-同款跨平台分别计数；总数是已同步平台条目数。未知字段为 null，已知零为 0。
-时长仅汇总已知数据，成就/奖杯按关联的独立集合汇总，避免共享奖杯集重复计数。
-不把 PSN 等级积分当作奖杯数量。没有每日历史，因此不生成每日游玩曲线。
-
-同步不会因空列表、隐私错误、网络错误而清空旧数据；退款/库移除不会自动删除旧条目，
-所以这里是累积同步收藏，未必与平台此刻库数量完全一致。PSN 明确的媒体应用按上述分类规则隐藏。
-部分失败会保留旧值并显示
-partial 状态。上次更新时间指库同步时间，成就可能更旧。
-
-Steam 使用公共 API；PSN 使用社区维护的非官方接口；Epic 尚未接入。PSN 已由用户配置并完成首次同步，
-完整账号数据准确性与范围仍待核对；Steam 的更广泛口径对比也待继续，详细进度见 TODO。
-
-布局截图：[演示首页](docs/screenshots/dashboard-demo.png)、[390px 游戏卡片](docs/screenshots/mobile-library.png)。
+继续开发前阅读 [工作规则](AGENTS.md)、[设计决策](docs/PROJECT.md) 和
+[待办与交接](TODO.md)。第三方许可见 [THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md)。
