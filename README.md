@@ -1,5 +1,7 @@
 # Game Shelf
 
+[![CI](https://github.com/yuyudeqiu/game-shelf/actions/workflows/ci.yml/badge.svg)](https://github.com/yuyudeqiu/game-shelf/actions/workflows/ci.yml)
+
 本地个人游戏书架：同步 Steam、PSN，查看游戏库、累计时长、成就 / 奖杯。
 Epic 尚未接入。Go + SQLite 后端，React + TypeScript + Vite 前端。
 
@@ -90,6 +92,10 @@ npm test       # Go 测试、前端类型检查和生产构建
 ```
 
 后端改动需重启服务；Vite 前端支持热更新。Go 服务使用构建后的 `web/dist`。
+
+GitHub Actions 在推送到 `main` 和提交 PR 时自动检查 Go 格式、模块校验、`go vet`、
+竞态测试、后端构建，以及前端锁定依赖安装、类型检查和生产构建；也可手动运行。
+CI 使用模拟平台接口，不需要 Steam / PSN 凭据，不代表真实账号验证。
 
 | HTTP 接口 | 用途 |
 | --- | --- |
