@@ -1,6 +1,6 @@
 # TODO 与当前交接
 
-更新：2026-10-21。使用说明见 [README](README.md)，架构与数据口径见
+更新：2026-10-22。使用说明见 [README](README.md)，架构与数据口径见
 [PROJECT](docs/PROJECT.md)，工作约束见 [AGENTS](AGENTS.md)。
 本文件只保留未完成事项、当前状态和最近交接；过程历史查 Git。
 
@@ -42,9 +42,14 @@
   账号不符、重复 / 非法记录、请求失败时保留旧值并报告 partial；缺失记录保持未知，
   显式零才是零。最近游玩 / 个人成就仍未知；实现依据见 `docs/EPIC.md`。
 - 项目远程为 https://github.com/yuyudeqiu/game-shelf ，origin / main；CI 已配置。
-  本次 Epic 接入、JSON 自动提取和累计时长作为一个本地签名提交保存；尚未推送。
+  Epic 接入、JSON 自动提取和累计时长已发布。
 - 提交身份与签名统一继承用户全局 Git 配置，已移除仓库 user.name / user.email 覆盖，
-  避免提交邮箱与 GPG 密钥身份不匹配；只重做本次未推送提交，不改已发布历史。
+  避免提交邮箱与 GPG 密钥身份不匹配。
+- 经用户授权，main 的 12 条已有提交统一重签：作者、作者日期、说明和每条文件快照
+  均与原提交逐一核对一致，提交者使用全局身份；历史哈希改变。签名交接作为独立文档提交。
+  原历史备份在忽略目录 `data/backups/before-history-resign-5433403.bundle`，
+  新旧哈希映射在 `data/backups/history-resign-map-5433403.json`。
+  GitHub 公钥登记未删除或替换；本地临时邮箱 UID 已移除。
 
 ## 验证与运行
 
@@ -61,4 +66,5 @@
   官方启动器逐款数值对照仍待用户核对。
 - 授权表单已支持完整 JSON 自动提取；隔离虚构样本截图在
   `data/qa/epic-json-extraction.png`，此前设置页截图为 `data/qa/epic-settings.png`。
-- `git diff --check` 通过。提交前已重跑 Go 测试、vet 与前端构建；本地签名提交，尚未推送。
+- 历史重签已逐条核对本地签名与原快照；代码内容不变，仅另更新本交接说明。
+  推送使用精确旧远程 SHA 的 `--force-with-lease`，GitHub 验证状态按远程查询确认。
