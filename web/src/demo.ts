@@ -76,7 +76,22 @@ export function demoDashboard(): Dashboard {
       earned: demoGames
         .filter((g) => g.platform === platform)
         .reduce((sum, g) => sum + (g.earned_count ?? 0), 0),
-      run: null,
+      // Illustrative sync outcomes only; never persisted or fetched from accounts.
+      run: {
+        id: -1,
+        platform,
+        started_at: now - 360,
+        finished_at: now - 300,
+        status: platform === "steam" ? "success" as const : "partial" as const,
+        items_synced: demoGames.filter((g) => g.platform === platform).length,
+        error_summary: null,
+        report: {
+          library_saved: true,
+          issues: platform === "steam" ? [] : platform === "psn"
+            ? [{ code: "trophy_mapping", count: 2 }]
+            : [{ code: "covers", count: 3 }],
+        },
+      },
       last_library_sync: now - 300,
     })),
     recent: demoGames.filter((g) => g.last_played_at !== null).slice(0, 6),

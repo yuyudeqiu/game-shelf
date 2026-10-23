@@ -1,6 +1,6 @@
 # TODO 与当前交接
 
-更新：2026-10-22。使用说明见 [README](README.md)，架构与数据口径见
+更新：2026-10-23。使用说明见 [README](README.md)，架构与数据口径见
 [PROJECT](docs/PROJECT.md)，工作约束见 [AGENTS](AGENTS.md)。
 本文件只保留未完成事项、当前状态和最近交接；过程历史查 Git。
 
@@ -28,43 +28,35 @@
   详情、分组或封面请求失败，登录正常。完整账号审计仍未完成。
 - 成就 / 奖杯详情、中文文本、PSN 本体与附加分组及等级筛选已实现。
   Steam 的 Half-Life、RPG Maker XP 曾缺少可用详情，未推断为零。
-- SQLite 当前 schema v4；分类迁移前备份在忽略目录
+- SQLite 当前 schema v5；分类迁移前备份在忽略目录
   `data/backups/before-psn-media-filter.db`，其他历史备份同在该目录。
 
 ## 当前交接
 
-- Epic 已接入平台设置：打开官方登录入口，将返回的整段 JSON 或单独的
-  authorizationCode 粘贴到本机页面，自动提取后点击连接。服务保存可续期令牌，代码不落盘；账号隔离包含隐藏条目。
-- 已实现完整 Library 分页与 Windows / Mac assets 校验、精确 ID 合并、Catalog
-  名称 / 分类 / 封面、独立后台同步、`npm run sync:epic`、状态展示与错误脱敏。
-  分类过滤保留原始记录，未知分类可见并报告 partial；元数据失败保留旧值。
-- Epic 累计时长已接入 Library playtime 接口，按 artifactId 与唯一 appName 对应。
-  账号不符、重复 / 非法记录、请求失败时保留旧值并报告 partial；缺失记录保持未知，
-  显式零才是零。最近游玩 / 个人成就仍未知；实现依据见 `docs/EPIC.md`。
+- 同步状态已改为“简短结果 + 点击展开详情”，区分封面、时长、成就 / 奖杯、元数据、
+  分类和补全未完成；只显示非零问题，平台固定能力限制独立展示。
+- 三平台同步结果持久化结构化 `report`，记录列表是否已保存和问题类型 / 数量。
+  旧记录 `report=null` 继续展示原摘要，不解析历史错误文字；下次同步生成新报告。
+- 数据库 schema v5 仅新增 `sync_runs.report_json`；列表更新时间优先依据实际保存结果，
+  旧记录沿用 success / partial 口径。迁移前 SQLite backup 位于忽略目录
+  `data/backups/before-sync-report.db`。
+- 详情可直接打开对应平台设置；演示模式包含明确标记的正常、奖杯缺口、封面缺口样本，
+  不写真实数据库。页面入口：http://127.0.0.1:8080/?demo=1。
+- 真实账号本轮已确认 Steam 64、PSN 8 个可见游戏；报告分别为 2 项成就详情缺口、
+  2 个游戏无唯一奖杯映射。Epic 本轮完成同步，272 个可见游戏，
+  仅报告 28 张封面暂不可用；元数据、分类和时长未报告同步异常。
 - 项目远程为 https://github.com/yuyudeqiu/game-shelf ，origin / main；CI 已配置。
-  Epic 接入、JSON 自动提取和累计时长已发布。
-- 提交身份与签名统一继承用户全局 Git 配置，已移除仓库 user.name / user.email 覆盖，
-  避免提交邮箱与 GPG 密钥身份不匹配。
-- 经用户授权，main 的 12 条已有提交统一重签：作者、作者日期、说明和每条文件快照
-  均与原提交逐一核对一致，提交者使用全局身份；历史哈希改变。签名交接作为独立文档提交。
-  原历史备份在忽略目录 `data/backups/before-history-resign-5433403.bundle`，
-  新旧哈希映射在 `data/backups/history-resign-map-5433403.json`。
-  GitHub 公钥登记未删除或替换；本地临时邮箱 UID 已移除。
+  提交身份与签名继承用户全局 Git 配置。
 
 ## 验证与运行
 
-- `go test ./...`、`go test -race -count=1 ./...`、`go vet ./...`、前端构建通过。
-  本次新增时长测试覆盖秒数、显式零 / NULL、账号不符、缺字段、负值、溢出、
-  重复 artifact、跨 namespace 映射歧义、请求失败与空响应保留。
-- 本机真实账号已 verify，时长只读接口返回 11 条非零记录，账号全部匹配；
-  使用本机保存的令牌，未输出凭据或原始认证响应。首次真实同步已完成：
-  时长请求成功、无歧义映射、0 元数据失败 / 未知分类；28 张封面不可用导致 partial。
-  HTTP API 确认 Epic 9 个可见游戏时长共 234.8 小时，未返回时长的游戏保持未知。
-- SQLite 保持 schema v4；同步前 SQLite backup 备份在
-  `data/backups/before-epic-playtime.db`（忽略目录），历史备份保留。
-- 服务已重建并运行于 http://127.0.0.1:8080。游戏库和时长通过本地 HTTP API 验证，
-  官方启动器逐款数值对照仍待用户核对。
-- 授权表单已支持完整 JSON 自动提取；隔离虚构样本截图在
-  `data/qa/epic-json-extraction.png`，此前设置页截图为 `data/qa/epic-settings.png`。
-- 历史重签已逐条核对本地签名与原快照；代码内容不变，仅另更新本交接说明。
-  推送使用精确旧远程 SHA 的 `--force-with-lease`，GitHub 验证状态按远程查询确认。
+- `go test ./...`、`go test -race -count=1 ./...`、`go vet ./...` 和
+  `npm --prefix web run build` 通过。
+- 新增模拟测试覆盖 schema v4 → v5 的历史记录与 NULL 保留、报告重开持久化、
+  未保存列表 / 失败不推进更新时间，以及列表落库后取消仍保存缺口与未完成报告。
+  三平台已有同步测试也核对了实际产生的问题类型与数量。
+- 浏览器检查：演示封面缺口展开、真实 PSN 奖杯缺口展开 / 收起、从详情打开
+  PlayStation 设置页签，以及真实 Epic 封面缺口结果。真实页面截图在忽略目录
+  `data/qa/sync-status-epic.png`；演示样本与真实账号检查分别进行。
+- 已构建本地服务，运行于 http://127.0.0.1:8080；读取 HTTP API 确认真实报告字段。
+  官方启动器逐款数值对照、完整账号覆盖审计和令牌续期验证仍见待办。

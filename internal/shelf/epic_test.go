@@ -394,6 +394,7 @@ func TestEpicMetadataPartialReclassificationAndCoverFailure(t *testing.T) {
 	if run.Status != "partial" || !strings.Contains(*run.ErrorSummary, "1 张封面") {
 		t.Fatal("cover failure not partial", run)
 	}
+	assertSyncIssue(t, run, "covers", 1)
 	// Disappearance from a subsequent complete list is not deletion.
 	f.mode = ""
 	f.items = f.items[:1]

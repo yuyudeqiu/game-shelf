@@ -97,6 +97,7 @@ func TestSyncPersistsIdempotentlyAndPreservesOnFailures(t *testing.T) {
 	if run.Status != "partial" {
 		t.Fatalf("expected partial, got %s", run.Status)
 	}
+	assertSyncIssue(t, run, "achievement_details", 2)
 	for _, m := range []string{"private", "broken"} {
 		mode = m
 		if err := syncer.Sync(ctx); err == nil {

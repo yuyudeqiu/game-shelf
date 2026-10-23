@@ -262,13 +262,41 @@ function RecentGameCard({ game, onOpen }: { game: Game; onOpen: () => void }) {
   );
 }
 function platformState(p: PlatformStatus) {
-  if (isDemo) return "演示数据";
+  if (isDemo && !p.run) return "演示数据";
   if (!p.supported) return "待接入";
   if (!p.configured) return p.count ? "本地缓存" : "未连接";
   if (p.run?.status === "running") return "同步中";
-  if (p.run?.status === "failed") return "同步失败";
-  if (p.run?.status === "partial") return "部分已更新";
-  return p.last_library_sync ? "已同步" : "等待同步";
+  if (p.run?.status === "failed") return p.last_library_sync || p.count ? "同步失败 · 保留上次数据" : "同步失败";
+  const report = p.run?.report;
+  if (p.run?.status === "partial") {
+    if (!report) return "部分已更新";
+    if (!report.library_saved) return "部分已更新";
+    const codes = new Set(report.issues.map((issue) => issue.code));
+    if (codes.has("metadata")) return "游戏库部分更新";
+    if (codes.size === 1 && codes.has("covers")) return "已更新 · 封面待补全";
+    if (codes.size === 1 && codes.has("classification")) return "已更新 · 分类待核对";
+    if ([...codes].every((code) => code === "trophy_mapping" || code === "trophy_mapping_request" || code === "achievement_details") && codes.size)
+      return `已更新 · ${p.platform === "psn" ? "奖杯" : "成就"}有缺口`;
+    if (codes.size === 1 && codes.has("playtime_request")) return "已更新 · 时长未更新";
+    if (codes.size === 1 && codes.has("playtime_mapping")) return "已更新 · 时长有缺口";
+    return report.library_saved ? "已更新 · 有待补全项" : "部分已更新";
+  }
+  return p.last_library_sync ? "已更新" : "等待同步";
+}
+function syncIssueText(code: string, count: number, platform: Platform) {
+  const noun = platform === "psn" ? "奖杯" : "成就";
+  const messages: Record<string, string> = {
+    covers: `${count} 张封面暂不可用，不影响已保存的游戏数据`,
+    achievement_details: `${count} 项${noun}详情或分组未能更新`,
+    trophy_mapping_request: `${count} 个游戏的奖杯映射请求失败`,
+    trophy_mapping: `${count} 个游戏未找到唯一奖杯映射`,
+    metadata: `${count} 个条目未获取到元数据，已有条目保留原值，新条目暂未入库`,
+    classification: `${count} 个条目分类待核对，仍保留展示`,
+    playtime_request: "时长请求失败，本次未更新时长",
+    playtime_mapping: `${count} 个条目的时长无法唯一对应`,
+    incomplete: "游戏列表已保存，后续补全未能全部完成",
+  };
+  return messages[code] ?? "部分数据未能更新";
 }
 
 export default function App() {
@@ -290,6 +318,8 @@ export default function App() {
   const [listLoading, setListLoading] = useState(!isDemo);
   const [help, setHelp] = useState(false);
   const modalRef = useRef<HTMLElement>(null);
+  const [settingsPlatform, setSettingsPlatform] = useState<Platform>("steam");
+  const [expandedPlatform, setExpandedPlatform] = useState<Platform | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
 
@@ -669,16 +699,12 @@ export default function App() {
               <div key={p.platform} className="connection-item">
                 <PlatformMark platform={p.platform} small />
                 <span>{labels[p.platform]}</span>
-                <span
-                  className={`connection-state ${p.run?.status === "failed" ? "failed" : ""}`}
-                  title={
-                    p.run?.error_summary ??
-                    (p.supported
-                      ? p.scope === "played"
-                        ? "游戏库来源：平台已玩列表"
-                        : "游戏库来源：平台拥有列表"
-                      : "将在后续版本接入")
-                  }
+                <button
+                  type="button"
+                  className={`connection-state ${p.run?.status === "failed" ? "failed" : p.run?.status === "partial" ? "warning" : ""}`}
+                  aria-expanded={expandedPlatform === p.platform}
+                  aria-controls={`sync-detail-${p.platform}`}
+                  onClick={() => setExpandedPlatform((current) => current === p.platform ? null : p.platform)}
                 >
                   {p.run?.status === "running" ? (
                     <LoaderCircle size={10} className="spin" />
@@ -686,7 +712,8 @@ export default function App() {
                     <i />
                   )}
                   {platformState(p)}
-                </span>
+                  <ChevronRight size={11} className={expandedPlatform === p.platform ? "sync-chevron-open" : ""} />
+                </button>
               </div>
             ))}
             <button onClick={() => setHelp(true)}>
@@ -694,6 +721,32 @@ export default function App() {
               <ArrowUpRight size={12} />
             </button>
           </div>
+
+          {dashboard?.platforms.filter((p) => p.platform === expandedPlatform).map((p) => (
+            <section className="sync-detail" id={`sync-detail-${p.platform}`} key={p.platform} aria-label={`${labels[p.platform]} 同步详情`}>
+              <div className="sync-detail-heading">
+                <div>
+                  <h3>{labels[p.platform]}{isDemo ? " · 演示同步结果" : ""} <span>{platformState(p)}</span></h3>
+                  <p>{p.run?.status === "running"
+                    ? `本次开始：${exactTime(p.run.started_at)}`
+                    : p.run?.finished_at ? `本次完成：${exactTime(p.run.finished_at)}` : "尚无同步结果"}</p>
+                </div>
+                <Button variant="ghost" size="icon" aria-label="收起同步详情" onClick={() => setExpandedPlatform(null)}><X size={15} /></Button>
+              </div>
+              {p.run?.status === "running" ? (
+                <p role="status">正在从平台获取数据，完成后自动更新结果。上次游戏列表更新：{exactTime(p.last_library_sync)}。</p>
+              ) : <>
+                {p.run?.report?.library_saved && <p>{p.run.report.issues.some((issue) => issue.code === "metadata") ? "本次已保存可获取的游戏条目，游戏列表仍有缺口。" : "本次游戏列表已保存。"}</p>}
+                {!!p.run?.report?.issues.length && <ul>{p.run.report.issues.map((issue) => <li key={issue.code}>{syncIssueText(issue.code, issue.count ?? 0, p.platform)}</li>)}</ul>}
+                {p.run?.error_summary && (!p.run.report || p.run.status === "failed" || p.run.report.issues.some((issue) => issue.code === "incomplete")) && <p className="sync-legacy-summary">{p.run.error_summary}</p>}
+                {((p.run?.status === "partial" || p.run?.status === "failed") && (!p.run.report || p.run.status === "failed" || p.run.report.issues.some((issue) => issue.code !== "covers" && issue.code !== "classification"))) && <p>未获取到的数据保留原值；此前没有数据的继续显示未知。{p.run.status === "failed" && `上次游戏列表更新：${exactTime(p.last_library_sync)}。`}</p>}
+              </>}
+              <div className="sync-detail-footer">
+                <span>{p.scope === "played" ? "来源：平台已玩列表" : "来源：平台拥有列表"}{p.platform === "epic" ? " · 成就与最近游玩时间尚未接入" : ""}</span>
+                {!isDemo && <Button variant="outline" size="sm" onClick={() => { setSettingsPlatform(p.platform); setSettingsOpen(true); }}>平台设置与同步<ArrowUpRight size={12} /></Button>}
+              </div>
+            </section>
+          ))}
 
           {!hasGames && !loading && !error && (
             <section className="setup-card">
@@ -1007,6 +1060,7 @@ export default function App() {
 
       {settingsOpen && (
         <SettingsDialog
+          initialPlatform={settingsPlatform}
           demo={isDemo}
           onClose={() => setSettingsOpen(false)}
           onSaved={() => {

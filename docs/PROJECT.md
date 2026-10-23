@@ -1,6 +1,6 @@
 # 设计决策
 
-更新：2026-10-21。使用说明见 [README](../README.md)，当前进度见 [TODO](../TODO.md)。
+更新：2026-10-23。使用说明见 [README](../README.md)，当前进度见 [TODO](../TODO.md)。
 这里只记录长期有效的设计和接口注意事项，历史过程查 Git。
 
 ## 架构与边界
@@ -15,7 +15,7 @@ Go 同步命令 → SQLite ← Go HTTP API ← React / Vite 前端。
 
 ## 数据与失败保留
 
-- 当前 schema v4：`games`、`achievement_sets`、`sync_runs`、`achievement_details`。
+- 当前 schema v5：`games`、`achievement_sets`、`sync_runs`、`achievement_details`。
   平台 ID 为字符串，游戏按 `(platform, platform_game_id)` upsert，不按名称匹配。
 - 时间为 UTC Unix 秒，时长为整数秒；NULL 是未知，0 是已知零。
   总量只汇总已知数据并暴露覆盖率；共享成就集只计一次，不把等级积分当奖杯数量。
@@ -27,6 +27,18 @@ Go 同步命令 → SQLite ← Go HTTP API ← React / Vite 前端。
   更新名称不能让个人解锁记录显得更新；分组请求失败保留旧名称。
 - 隐藏内容需显式揭示；状态只在当前详情会话保留，并参与搜索，关闭后重置。
   演示数据与真实数据库隔离，不虚构逐条详情或每日活动历史。
+
+## 同步结果展示
+
+- `sync_runs.report_json` 保存结构化结果：`library_saved` 表示本次列表写入已完成，
+  `issues` 仅记录非零问题的类型与数量，不包含凭据、原始响应或带认证的 URL。
+  运行中 / 历史记录的报告可为 NULL；旧记录保持原摘要，不从文字反推分类。
+- 原有 running / success / partial / failed 状态保留。首页根据报告说明影响范围，
+  点击展开完成时间与问题，设置入口直接选择对应平台。
+- 元数据缺失可能导致新条目未入库，因此不能把列表已写入等同于全部条目已更新。
+  封面缺口不表示数值数据同步失败；平台未接入的能力不作为本次异常。
+- 列表更新时间优先依据报告的实际保存结果，旧记录沿用 success / partial 判定。
+  列表落库后中断继续保留数据、已观察到的问题及未完成标记。
 
 ## 本地设置
 

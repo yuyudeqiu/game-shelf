@@ -21,12 +21,14 @@ export default function SettingsDialog({
   onClose,
   onSaved,
   demo,
+  initialPlatform = "steam",
 }: {
   onClose: () => void;
   onSaved: () => void;
   demo: boolean;
+  initialPlatform?: "steam" | "psn" | "epic";
 }) {
-  const [platform, setPlatform] = useState<"steam" | "psn" | "epic">("steam");
+  const [platform, setPlatform] = useState<"steam" | "psn" | "epic">(initialPlatform);
   const [status, setStatus] = useState<Status | null>(null);
   const [key, setKey] = useState("");
   const [id, setID] = useState("");

@@ -189,7 +189,7 @@ func TestPSNCategoryMigrationAndPersistence(t *testing.T) {
 	if err := s.SaveAchievementDetails(ctx, g, []Achievement{{APIName: "0", Name: "Preserved"}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.DB.Exec(`ALTER TABLE games DROP COLUMN source_category; PRAGMA user_version=3;`); err != nil {
+	if _, err := s.DB.Exec(`ALTER TABLE games DROP COLUMN source_category; ALTER TABLE sync_runs DROP COLUMN report_json; PRAGMA user_version=3;`); err != nil {
 		t.Fatal(err)
 	}
 	s.DB.Close()

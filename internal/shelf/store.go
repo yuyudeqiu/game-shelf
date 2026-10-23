@@ -3,6 +3,7 @@ package shelf
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,14 +33,31 @@ type Game struct {
 	AchievementUpdatedAt *int64  `json:"achievement_updated_at"`
 }
 
+// SyncReport records outcomes, not platform capability or historical coverage.
+type SyncReport struct {
+	LibrarySaved bool        `json:"library_saved"`
+	Issues       []SyncIssue `json:"issues"`
+}
+type SyncIssue struct {
+	Code  string `json:"code"`
+	Count int    `json:"count,omitempty"`
+}
+
+func (r *SyncReport) add(code string, count int) {
+	if count > 0 {
+		r.Issues = append(r.Issues, SyncIssue{Code: code, Count: count})
+	}
+}
+
 type SyncRun struct {
-	ID           int64   `json:"id"`
-	Platform     string  `json:"platform"`
-	StartedAt    int64   `json:"started_at"`
-	FinishedAt   *int64  `json:"finished_at"`
-	Status       string  `json:"status"`
-	ItemsSynced  int     `json:"items_synced"`
-	ErrorSummary *string `json:"error_summary"`
+	ID           int64       `json:"id"`
+	Platform     string      `json:"platform"`
+	StartedAt    int64       `json:"started_at"`
+	FinishedAt   *int64      `json:"finished_at"`
+	Status       string      `json:"status"`
+	ItemsSynced  int         `json:"items_synced"`
+	ErrorSummary *string     `json:"error_summary"`
+	Report       *SyncReport `json:"report"`
 }
 
 func Open(path string) (*Store, error) {
@@ -61,7 +79,7 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	if version > 4 {
+	if version > 5 {
 		db.Close()
 		return nil, fmt.Errorf("database schema %d is newer than this application", version)
 	}
@@ -127,6 +145,14 @@ PRAGMA user_version=1;`)
 	if version < 4 {
 		_, err = db.Exec(`BEGIN; ALTER TABLE games ADD COLUMN source_category TEXT;
  PRAGMA user_version=4; COMMIT;`)
+		if err != nil {
+			_, _ = db.Exec("ROLLBACK")
+			db.Close()
+			return nil, err
+		}
+	}
+	if version < 5 {
+		_, err = db.Exec(`BEGIN; ALTER TABLE sync_runs ADD COLUMN report_json TEXT; PRAGMA user_version=5; COMMIT;`)
 		if err != nil {
 			_, _ = db.Exec("ROLLBACK")
 			db.Close()
@@ -211,16 +237,33 @@ func (s *Store) StartRun(ctx context.Context, platform string) (int64, error) {
 	return r.LastInsertId()
 }
 
-func (s *Store) FinishRun(ctx context.Context, id int64, status string, count int, summary *string) error {
-	_, err := s.DB.ExecContext(ctx, `UPDATE sync_runs SET finished_at=?,status=?,items_synced=?,error_summary=? WHERE id=?`, time.Now().Unix(), status, count, summary, id)
+func (s *Store) FinishRun(ctx context.Context, id int64, status string, count int, summary *string, reports ...*SyncReport) error {
+	var reportJSON *string
+	if len(reports) > 0 && reports[0] != nil {
+		report := reports[0]
+		data, err := json.Marshal(report)
+		if err != nil {
+			return err
+		}
+		value := string(data)
+		reportJSON = &value
+	}
+	_, err := s.DB.ExecContext(ctx, `UPDATE sync_runs SET finished_at=?,status=?,items_synced=?,error_summary=?,report_json=? WHERE id=?`, time.Now().Unix(), status, count, summary, reportJSON, id)
 	return err
 }
 
 func (s *Store) LatestRun(ctx context.Context, platform string) (*SyncRun, error) {
 	var r SyncRun
-	err := s.DB.QueryRowContext(ctx, `SELECT id,platform,started_at,finished_at,status,items_synced,error_summary FROM sync_runs WHERE platform=? ORDER BY id DESC LIMIT 1`, platform).Scan(&r.ID, &r.Platform, &r.StartedAt, &r.FinishedAt, &r.Status, &r.ItemsSynced, &r.ErrorSummary)
+	var reportJSON *string
+	err := s.DB.QueryRowContext(ctx, `SELECT id,platform,started_at,finished_at,status,items_synced,error_summary,report_json FROM sync_runs WHERE platform=? ORDER BY id DESC LIMIT 1`, platform).Scan(&r.ID, &r.Platform, &r.StartedAt, &r.FinishedAt, &r.Status, &r.ItemsSynced, &r.ErrorSummary, &reportJSON)
 	if err == sql.ErrNoRows {
 		return nil, nil
+	}
+	if err == nil && reportJSON != nil {
+		r.Report = &SyncReport{}
+		if e := json.Unmarshal([]byte(*reportJSON), r.Report); e != nil {
+			return nil, e
+		}
 	}
 	return &r, err
 }
@@ -228,6 +271,6 @@ func (s *Store) LatestRun(ctx context.Context, platform string) (*SyncRun, error
 // A partial run has still refreshed the library; failures should not erase that timestamp.
 func (s *Store) LastLibrarySync(ctx context.Context, platform string) (*int64, error) {
 	var result *int64
-	err := s.DB.QueryRowContext(ctx, `SELECT MAX(finished_at) FROM sync_runs WHERE platform=? AND status IN ('success','partial')`, platform).Scan(&result)
+	err := s.DB.QueryRowContext(ctx, `SELECT MAX(finished_at) FROM sync_runs WHERE platform=? AND (json_extract(report_json, '$.library_saved')=1 OR (report_json IS NULL AND status IN ('success','partial')))`, platform).Scan(&result)
 	return result, err
 }

@@ -236,6 +236,7 @@ func TestPSNAuthSyncRefreshAndSharedTrophyDetails(t *testing.T) {
 	if run.Status != "partial" {
 		t.Fatal("partial details not reported")
 	}
+	assertSyncIssue(t, run, "achievement_details", 2)
 	for _, mode := range []string{"page-fail", "repeat-page", "missing-total", "private"} {
 		fixture.mode = mode
 		if err = settings.Sync(ctx); err == nil {

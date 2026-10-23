@@ -24,6 +24,10 @@ export interface SyncRun {
   status: "running" | "success" | "partial" | "failed";
   items_synced: number;
   error_summary: string | null;
+  report?: {
+    library_saved: boolean;
+    issues: { code: string; count?: number }[];
+  } | null;
 }
 export interface PlatformStatus {
   platform: Platform;

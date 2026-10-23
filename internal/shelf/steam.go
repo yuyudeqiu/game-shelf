@@ -150,14 +150,18 @@ func (s *Syncer) Sync(ctx context.Context) (err error) {
 	}
 	status, count := "failed", 0
 	var summary *string
+	report := &SyncReport{Issues: []SyncIssue{}}
 	defer func() {
 		if err != nil {
+			if report.LibrarySaved {
+				report.add("incomplete", 1)
+			}
 			message := err.Error()
 			summary = &message
 		}
 		finishCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if finishErr := s.Store.FinishRun(finishCtx, runID, status, count, summary); finishErr != nil && err == nil {
+		if finishErr := s.Store.FinishRun(finishCtx, runID, status, count, summary, report); finishErr != nil && err == nil {
 			err = errors.New("could not save sync result")
 		}
 	}()
@@ -178,6 +182,7 @@ func (s *Syncer) Sync(ctx context.Context) (err error) {
 	if err = s.Store.SaveLibrary(ctx, games); err != nil {
 		return errors.New("could not save Steam library")
 	}
+	report.LibrarySaved = true
 	count = len(games)
 	// Recent activity is enriched first, so large libraries become useful quickly.
 	sort.SliceStable(games, func(i, j int) bool { return timestamp(games[i].LastPlayedAt) > timestamp(games[j].LastPlayedAt) })
@@ -188,6 +193,10 @@ func (s *Syncer) Sync(ctx context.Context) (err error) {
 	ticker := time.NewTicker(spacing)
 	defer ticker.Stop()
 	failures, coverFailures := 0, 0
+	defer func() {
+		report.add("achievement_details", failures)
+		report.add("covers", coverFailures)
+	}()
 	for _, g := range games {
 		if ctx.Err() != nil {
 			status = "partial"

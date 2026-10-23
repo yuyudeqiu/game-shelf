@@ -172,14 +172,18 @@ func (s *PSNSettings) sync(ctx context.Context, refreshDetails bool) (err error)
 	}
 	status, count := "failed", 0
 	var summary *string
+	report := &SyncReport{Issues: []SyncIssue{}}
 	defer func() {
 		if err != nil {
+			if report.LibrarySaved {
+				report.add("incomplete", 1)
+			}
 			message := err.Error()
 			summary = &message
 		}
 		finish, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if e := s.store.FinishRun(finish, runID, status, count, summary); e != nil && err == nil {
+		if e := s.store.FinishRun(finish, runID, status, count, summary, report); e != nil && err == nil {
 			err = errors.New("无法保存 PSN 同步状态")
 		}
 	}()
@@ -207,9 +211,9 @@ func (s *PSNSettings) sync(ctx context.Context, refreshDetails bool) (err error)
 	if err = s.persist(cfg); err != nil {
 		return err
 	}
-	count, summary, err = syncPSN(ctx, &client, s.store, s.dir, refreshDetails)
+	count, summary, err = syncPSN(ctx, &client, s.store, s.dir, refreshDetails, report)
 	if err != nil {
-		if count > 0 {
+		if report.LibrarySaved {
 			status = "partial"
 		}
 		return err
@@ -221,7 +225,11 @@ func (s *PSNSettings) sync(ctx context.Context, refreshDetails bool) (err error)
 	return nil
 }
 
-func syncPSN(ctx context.Context, p *PSN, store *Store, dir string, refreshDetails bool) (int, *string, error) {
+func syncPSN(ctx context.Context, p *PSN, store *Store, dir string, refreshDetails bool, reports ...*SyncReport) (int, *string, error) {
+	report := &SyncReport{Issues: []SyncIssue{}}
+	if len(reports) > 0 && reports[0] != nil {
+		report = reports[0]
+	}
 	games, err := p.Library(ctx)
 	if err != nil {
 		return 0, nil, err
@@ -239,6 +247,7 @@ func syncPSN(ctx context.Context, p *PSN, store *Store, dir string, refreshDetai
 	if err = store.SaveLibrary(ctx, games); err != nil {
 		return 0, nil, errors.New("无法保存 PSN 游戏列表")
 	}
+	report.LibrarySaved = true
 	// Persist classifications only after full pagination/validation, retaining app
 	// records for recovery. Use the same stored view as the API, so a missing category
 	// cannot undo an earlier confirmed media classification. Do not enrich apps.
@@ -261,6 +270,7 @@ func syncPSN(ctx context.Context, p *PSN, store *Store, dir string, refreshDetai
 	games = filtered
 	mappings := map[string]psnTrophyTitle{}
 	mappingFailed := 0
+	defer func() { report.add("trophy_mapping_request", mappingFailed) }()
 	for start := 0; start < len(games); start += 5 {
 		end := min(start+5, len(games))
 		ids := []string{}
@@ -292,6 +302,11 @@ func syncPSN(ctx context.Context, p *PSN, store *Store, dir string, refreshDetai
 	coverSync := &Syncer{Store: store, Steam: NewSteam("", ""), DataDir: dir}
 	coverSync.Steam.HTTP = p.HTTP
 	failures, coverFailures, unmapped := 0, 0, 0
+	defer func() {
+		report.add("trophy_mapping", unmapped)
+		report.add("achievement_details", failures)
+		report.add("covers", coverFailures)
+	}()
 	// Shared sets are requested once per run and linked by stable set IDs, never names.
 	fetched := map[string][]Achievement{}
 	unavailable := map[string]bool{}

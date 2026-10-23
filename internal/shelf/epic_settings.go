@@ -235,14 +235,18 @@ func (s *EpicSettings) Sync(ctx context.Context) (err error) {
 	}
 	status, count := "failed", 0
 	var summary *string
+	report := &SyncReport{Issues: []SyncIssue{}}
 	defer func() {
 		if err != nil {
+			if report.LibrarySaved {
+				report.add("incomplete", 1)
+			}
 			msg := err.Error()
 			summary = &msg
 		}
 		finish, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if e := s.store.FinishRun(finish, runID, status, count, summary); e != nil && err == nil {
+		if e := s.store.FinishRun(finish, runID, status, count, summary, report); e != nil && err == nil {
 			err = errors.New("无法保存 Epic 同步状态")
 		}
 	}()
@@ -261,11 +265,19 @@ func (s *EpicSettings) Sync(ctx context.Context) (err error) {
 		artifacts[item.AppName]++
 	}
 	timeFailures, ambiguous := 0, 0
+	defer func() {
+		report.add("playtime_request", timeFailures)
+		report.add("playtime_mapping", ambiguous)
+	}()
 	if timeErr != nil {
 		timeFailures = 1
 	}
 	games := make([]Game, 0, len(items))
 	metadataFailures, unknown := 0, 0
+	defer func() {
+		report.add("metadata", metadataFailures)
+		report.add("classification", unknown)
+	}()
 	for n, item := range items {
 		if n > 0 && s.Spacing > 0 {
 			timer := time.NewTimer(s.Spacing)
@@ -305,6 +317,7 @@ func (s *EpicSettings) Sync(ctx context.Context) (err error) {
 	if s.store.SaveLibrary(ctx, games) != nil {
 		return errors.New("无法保存 Epic 游戏列表")
 	}
+	report.LibrarySaved = true
 	status = "partial"
 	visible, err := s.store.Games(ctx)
 	if err != nil {
@@ -322,6 +335,7 @@ func (s *EpicSettings) Sync(ctx context.Context) (err error) {
 	coverHTTP.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	coverSync.Steam.HTTP = &coverHTTP
 	coverFailures := 0
+	defer func() { report.add("covers", coverFailures) }()
 	for _, g := range games {
 		stored, ok := byID[g.PlatformGameID]
 		if !ok {
